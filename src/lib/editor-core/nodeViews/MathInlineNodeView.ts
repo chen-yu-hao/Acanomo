@@ -2,6 +2,7 @@ import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { getMathRenderer } from '../renderers';
+import { parseEquationMetadata } from '../../academic/academic';
 import { registerActiveEdit, unregisterActiveEdit } from './activeEditRegistry';
 
 export class MathInlineNodeView {
@@ -121,15 +122,18 @@ export class MathInlineNodeView {
   private async renderKaTeX(): Promise<void> {
     const id = ++this.renderId;
     const tex = this.node.attrs.tex as string;
+    const metadata = parseEquationMetadata(tex);
     this.dom.setAttribute('data-tex', tex);
-    this.dom.textContent = tex ? `$${tex}$` : '';
+    if (metadata.label) this.dom.id = `eq-${metadata.label}`;
+    else this.dom.removeAttribute('id');
+    this.dom.textContent = tex ? `$${metadata.renderTex}$` : '';
     if (!tex) return;
 
     const mathRenderer = getMathRenderer();
     if (!mathRenderer) return;
 
     try {
-      const result = await mathRenderer.render(tex, { displayMode: false });
+      const result = await mathRenderer.render(metadata.renderTex, { displayMode: false });
       if (id !== this.renderId) return; // 放弃过期渲染
       if (result.error) {
         this.dom.textContent = `$${tex}$`;

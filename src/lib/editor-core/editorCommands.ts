@@ -896,6 +896,14 @@ export function executeEditorCommand(
       }
       return true;
     }
+    case 'insertCitation':
+      return insertInlineNode(view, schema.nodes.citation, { keys: [...command.keys] });
+    case 'insertEquationReference':
+      return insertInlineNode(view, schema.nodes.equation_ref, { label: command.label });
+    case 'addEquationLabel':
+      return addEquationLabel(view, command.label);
+    case 'insertBibliography':
+      return insertBibliography(view);
     case 'insertMermaidBlock':
       return insertMermaidBlock(view, command.code ?? '', { enterEdit: !command.code });
     case 'insertDiagramBlock':
@@ -1062,6 +1070,52 @@ function insertInlineNode(
   if (!node) return false;
 
   view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+  return true;
+}
+
+function addEquationLabel(view: EditorView, label: string): boolean {
+  const normalized = label.trim();
+  if (!/^[A-Za-z0-9:_-]+$/.test(normalized)) return false;
+  const { state } = view;
+  let pos: number | null = null;
+  if (state.selection instanceof NodeSelection && state.selection.node.type.name === 'math_block') {
+    pos = state.selection.from;
+  } else if (state.selection instanceof NodeSelection && state.selection.node.type.name === 'math_inline') {
+    pos = state.selection.from;
+  } else {
+    for (let depth = state.selection.$from.depth; depth > 0; depth -= 1) {
+      const node = state.selection.$from.node(depth);
+      if (node.type.name === 'math_block') {
+        pos = state.selection.$from.before(depth);
+        break;
+      }
+    }
+    if (pos === null) {
+      const nodeBefore = state.selection.$from.nodeBefore;
+      if (nodeBefore?.type.name === 'math_inline') pos = state.selection.$from.pos - nodeBefore.nodeSize;
+    }
+  }
+  if (pos === null) return false;
+  const node = state.doc.nodeAt(pos);
+  if (!node || (node.type.name !== 'math_block' && node.type.name !== 'math_inline')) return false;
+  const tex = String(node.attrs.tex ?? '').replace(/\\label\{[^{}]+\}/g, '').trimEnd();
+  const nextTex = `${tex}${tex ? node.type.name === 'math_inline' ? ' ' : '\n' : ''}\\label{${normalized}}`;
+  view.dispatch(state.tr.setNodeMarkup(pos, node.type, { ...node.attrs, tex: nextTex }).scrollIntoView());
+  return true;
+}
+
+function insertBibliography(view: EditorView): boolean {
+  const { state } = view;
+  let exists = false;
+  state.doc.descendants((node) => {
+    if (node.type.name === 'bibliography_block') exists = true;
+    return !exists;
+  });
+  if (exists) return false;
+  const node = schema.nodes.bibliography_block.create();
+  const position = state.doc.content.size;
+  const tr = state.tr.insert(position, node);
+  view.dispatch(tr);
   return true;
 }
 

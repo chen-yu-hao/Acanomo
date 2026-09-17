@@ -7,6 +7,7 @@ mod i18n;
 mod models;
 mod pdf_outline;
 mod software_update;
+mod zotero;
 mod text_document;
 mod window;
 mod windows_package;
@@ -286,6 +287,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::zotero::zotero_status,
+            crate::zotero::zotero_items,
+            crate::zotero::zotero_search,
             crate::export::export_html,
             crate::export::export_pdf_from_html,
             crate::export::read_file_as_base64,

@@ -233,6 +233,16 @@ fn build_file_menu<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::menu::Submen
 
 fn build_edit_menu<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::menu::Submenu<R>, String> {
     let locale = i18n::effective_locale(app);
+    let academic_menu = SubmenuBuilder::new(app, tr(locale, "menu_academic"))
+        .item(&menu_item(app, "academic-insert-citation", tr(locale, "menu_academic_citation"), Some("CmdOrCtrl+Shift+C"))?)
+        .item(&menu_item(app, "academic-insert-equation-ref", tr(locale, "menu_academic_equation_ref"), Some("CmdOrCtrl+Shift+R"))?)
+        .item(&menu_item(app, "academic-add-equation-label", tr(locale, "menu_academic_label"), None)?)
+        .item(&menu_item(app, "academic-document-settings", tr(locale, "menu_academic_settings"), None)?)
+        .item(&menu_item(app, "academic-insert-bibliography", tr(locale, "menu_academic_bibliography"), None)?)
+        .separator()
+        .item(&menu_item(app, "academic-refresh-data", tr(locale, "menu_academic_refresh"), None)?)
+        .build()
+        .map_err(|e| e.to_string())?;
     SubmenuBuilder::new(app, tr(locale, "menu_edit"))
         .item(&menu_item(
             app,
@@ -251,6 +261,8 @@ fn build_edit_menu<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::menu::Submen
         .copy()
         .paste()
         .select_all()
+        .separator()
+        .item(&academic_menu)
         .build()
         .map_err(|e| e.to_string())
 }

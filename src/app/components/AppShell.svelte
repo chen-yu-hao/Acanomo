@@ -152,6 +152,12 @@
   export let pendingInlineMarks: InlinePendingMarks;
   export let openTablePicker: () => void;
   export let openLinkPicker: () => void;
+  export let insertAcademicCitation: () => void;
+  export let insertAcademicEquationReference: () => void;
+  export let addAcademicEquationLabel: () => void;
+  export let editAcademicSettings: () => void;
+  export let insertAcademicBibliography: () => void;
+  export let refreshAcademicData: () => void;
   export let openSearchPanel: (replaceVisible?: boolean) => void;
   export let closeSearchPanel: () => void;
   export let updateSearchQuery: (event: Event) => void;
@@ -331,6 +337,12 @@
       {runCommand}
       {openTablePicker}
       {openLinkPicker}
+      {insertAcademicCitation}
+      {insertAcademicEquationReference}
+      {addAcademicEquationLabel}
+      {editAcademicSettings}
+      {insertAcademicBibliography}
+      {refreshAcademicData}
       {editFrontMatter}
       {showUnavailableFeature}
       {setMode}

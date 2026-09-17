@@ -13,6 +13,8 @@ import {
 import type { DiagramRenderer } from '../lib/services/render';
 import type { AppearancePreferences, MermaidThemeDefinition } from '../lib/theme/types';
 import { applyResolvedTheme, resolveTheme } from '../app/services/themeManager';
+import { bibliographyOrder, buildAcademicIndex, formatBibliography, formatCitation, parseAcademicSettings, parseCitationKeys, parseEquationMetadata, type ZoteroItem } from '../lib/academic/academic';
+import { parseMarkdown } from '../lib/editor-core/markdown';
 
 /** Quick Look 渲染器可选的文件上下文，用于标题展示和相对资源解析。 */
 export interface QuickLookPreviewOptions {
@@ -20,6 +22,7 @@ export interface QuickLookPreviewOptions {
   fileName?: string;
   /** 原始文档父目录的绝对路径；缺失时不解析相对图片路径。 */
   documentDirectory?: string;
+  citationItems?: ZoteroItem[];
 }
 
 /** 原生 Quick Look 扩展传给内嵌渲染器的完整数据。 */
@@ -78,7 +81,7 @@ const ALLOWED_TAGS = new Set([
 ]);
 
 const DISCARD_TAGS = new Set(['script', 'style', 'iframe', 'object', 'embed']);
-const GLOBAL_ATTRS = new Set(['class', 'title']);
+const GLOBAL_ATTRS = new Set(['class', 'title', 'id']);
 const ATTRS_BY_TAG: Record<string, Set<string>> = {
   a: new Set(['href', 'title', 'target', 'rel']),
   div: new Set(['class', 'data-callout-type']),
@@ -269,6 +272,45 @@ function createQuickLookMarkdownIt() {
 
   md.inline.ruler.after('image', 'nomo_image_attrs', parseImageAttrs);
   md.inline.ruler.after('backticks', 'nomo_math_inline', parseMathInline);
+  md.inline.ruler.before('link', 'nomo_citation', (state, silent) => {
+    const pos = state.pos;
+    if (state.src.slice(pos, pos + 2) !== '[@') return false;
+    const end = state.src.indexOf(']', pos + 2);
+    if (end < 0) return false;
+    const raw = state.src.slice(pos + 1, end);
+    const keys = parseCitationKeys(raw);
+    if (!keys.length || raw.replace(/@([A-Za-z0-9][A-Za-z0-9_-]*)/g, '').replace(/[;\s]/g, '')) return false;
+    if (!silent) {
+      const token = state.push('nomo_citation', '', 0);
+      token.meta = { keys };
+    }
+    state.pos = end + 1;
+    return true;
+  });
+  md.inline.ruler.before('escape', 'nomo_equation_ref', (state, silent) => {
+    const pos = state.pos;
+    if (state.src.slice(pos, pos + 7) !== '\\eqref{') return false;
+    const end = state.src.indexOf('}', pos + 7);
+    if (end < 0) return false;
+    const label = state.src.slice(pos + 7, end).trim();
+    if (!label) return false;
+    if (!silent) {
+      const token = state.push('nomo_equation_ref', '', 0);
+      token.content = label;
+    }
+    state.pos = end + 1;
+    return true;
+  });
+  md.block.ruler.before('reference', 'nomo_bibliography', (state, startLine, _endLine, silent) => {
+    const start = state.bMarks[startLine] + state.tShift[startLine];
+    if (state.src.slice(start, state.eMarks[startLine]).trim() !== '<!-- markedown:bibliography -->') return false;
+    if (!silent) {
+      const token = state.push('nomo_bibliography', 'section', 0);
+      token.map = [startLine, startLine + 1];
+    }
+    state.line = startLine + 1;
+    return true;
+  });
   md.block.ruler.after('fence', 'nomo_math_display', parseMathDisplay, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
   });
@@ -282,10 +324,40 @@ function createQuickLookMarkdownIt() {
   md.renderer.rules.callout_close = () => '</div></div>';
 
   md.renderer.rules.math_inline = (tokens, index) => {
-    return `<span class="math-inline">${renderKatex(tokens[index].content, false)}</span>`;
+    const metadata = parseEquationMetadata(tokens[index].content);
+    return `<span class="math-inline"${metadata.label ? ` id="eq-${escapeHtml(metadata.label)}"` : ''}>${renderKatex(metadata.renderTex, false)}</span>`;
   };
-  md.renderer.rules.math_display = (tokens, index) => {
-    return `<div class="math-block">${renderKatex(tokens[index].content, true)}</div>`;
+  md.renderer.rules.math_display = (tokens, index, _options, env) => {
+    const metadata = parseEquationMetadata(tokens[index].content);
+    const blockEquations = env.academicIndex?.equations.filter((candidate: { tex: string; block: boolean }) => candidate.block && candidate.tex === tokens[index].content);
+    const occurrence = env.mathOccurrences?.get(tokens[index].content) ?? 0;
+    const entry = blockEquations?.[occurrence];
+    env.mathOccurrences?.set(tokens[index].content, occurrence + 1);
+    return `<div class="math-block"${metadata.label ? ` id="eq-${escapeHtml(metadata.label)}"` : ''}>${renderKatex(metadata.renderTex, true)}${entry?.number ? `<span class="equation-number">(${escapeHtml(entry.number)})</span>` : ''}</div>`;
+  };
+  md.renderer.rules.nomo_citation = (tokens, index, _options, env) => {
+    const keys = tokens[index].meta?.keys as string[];
+    const order = env.academicIndex?.citationOrder as string[] ?? [];
+    const items = env.citationItems as Map<string, ZoteroItem>;
+    if (keys.some((key) => !items.has(key))) return `<span class="citation-node is-unresolved">${escapeHtml(`[@${keys.join('; @')}]`)}</span>`;
+    const style = env.academicSettings.citationStyle;
+    const text = style === 'numeric'
+      ? `[${keys.map((key) => order.indexOf(key) + 1).join(', ')}]`
+      : `(${keys.map((key) => formatCitation(items.get(key), style)).join('; ')})`;
+    return `<span class="citation-node">${escapeHtml(text)}</span>`;
+  };
+  md.renderer.rules.nomo_equation_ref = (tokens, index, _options, env) => {
+    const label = tokens[index].content;
+    const target = env.academicIndex?.equationsByLabel.get(label);
+    const text = target ? target.number ?? label : `?${label}`;
+    return `<a class="equation-ref${target ? '' : ' is-unresolved'}" href="#eq-${escapeHtml(label)}">(${escapeHtml(text)})</a>`;
+  };
+  md.renderer.rules.nomo_bibliography = (_tokens, _index, _options, env) => {
+    const keys = env.academicIndex?.citationOrder as string[] ?? [];
+    const items = env.citationItems as Map<string, ZoteroItem>;
+    const style = env.academicSettings.citationStyle;
+    const listTag = style === 'numeric' ? 'ol' : 'ul';
+    return `<div class="bibliography-block"><h2>References</h2><${listTag}>${bibliographyOrder(keys, items, style).map((key) => `<li id="ref-${escapeHtml(key)}"${items.has(key) ? '' : ' class="is-unresolved"'}>${escapeHtml(items.has(key) ? formatBibliography(items.get(key), style) : `[@${key}] unresolved`)}</li>`).join('')}</${listTag}></div>`;
   };
 
   md.renderer.rules.image = (tokens, index, options, env, self) => {
@@ -344,8 +416,15 @@ function createQuickLookMarkdownIt() {
 
 /** 只返回经过安全过滤的 Markdown 正文，供不需要 Quick Look 外壳的只读视图复用。 */
 export function renderMarkdownPreviewBody(markdown: string, options: QuickLookPreviewOptions = {}) {
+  const doc = parseMarkdown(markdown);
+  const academicSettings = parseAcademicSettings(String(doc.attrs.frontMatterPrefix ?? ''));
+  const academicIndex = buildAcademicIndex(doc, academicSettings);
   const body = markdownIt.render(markdown, {
     documentDirectory: options.documentDirectory,
+    academicIndex,
+    academicSettings,
+    citationItems: new Map((options.citationItems ?? []).map((item) => [item.key, item])),
+    mathOccurrences: new Map<string, number>(),
   });
   return sanitizePreviewHtml(renderTaskListItems(body));
 }

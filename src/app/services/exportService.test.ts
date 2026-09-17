@@ -76,6 +76,19 @@ describe('exportService', () => {
     expect(output).toContain('正文内容');
   });
 
+  it('keeps academic citations, formula links, numbering and bibliography in exported HTML', () => {
+    const input = '<div class="math-block" contenteditable="false" id="eq-energy">E<span class="equation-number">(1)</span></div>'
+      + '<p><span class="citation-node" contenteditable="false">[1]</span> <a class="equation-ref" contenteditable="false" href="#eq-energy">(1)</a></p>'
+      + '<section class="bibliography-block" contenteditable="false"><h2>References</h2><ol><li>Paper</li></ol></section>';
+    const output = cleanEditorArtifacts(input);
+    expect(output).toContain('id="eq-energy"');
+    expect(output).toContain('equation-number');
+    expect(output).toContain('citation-node');
+    expect(output).toContain('href="#eq-energy"');
+    expect(output).toContain('<li>Paper</li>');
+    expect(output).not.toContain('contenteditable');
+  });
+
   it('inlineLocalImages 保留 data/blob 图片链接，对 http/https 尝试转 base64', async () => {
     const originalFetch = globalThis.fetch;
     // 模拟 fetch 返回图片 blob

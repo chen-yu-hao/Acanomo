@@ -153,5 +153,12 @@
   "applyLink": "应用链接",
   "removeLink": "移除链接",
   "closeLinkEditor": "关闭链接编辑器",
-  "interfaceLanguageJaJp": "日本語"
+  "interfaceLanguageJaJp": "日本語",
+  "academicMenu": "学术引用",
+  "academicInsertCitation": "插入文献引用...",
+  "academicInsertEquationRef": "插入公式引用...",
+  "academicAddLabel": "为当前公式添加标签",
+  "academicSettings": "文档编号设置...",
+  "academicBibliography": "添加参考文献列表",
+  "academicRefresh": "刷新文献数据"
 }

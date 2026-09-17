@@ -153,5 +153,12 @@
   "linkHref": "リンク先",
   "applyLink": "リンクを適用",
   "removeLink": "リンクを削除",
-  "closeLinkEditor": "リンクエディターを閉じる"
+  "closeLinkEditor": "リンクエディターを閉じる",
+  "academicMenu": "学術引用",
+  "academicInsertCitation": "文献引用を挿入...",
+  "academicInsertEquationRef": "数式参照を挿入...",
+  "academicAddLabel": "現在の数式にラベルを付ける",
+  "academicSettings": "文書の番号設定...",
+  "academicBibliography": "参考文献一覧を挿入",
+  "academicRefresh": "文献データを更新"
 }

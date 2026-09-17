@@ -590,3 +590,7 @@ body:focus-visible,
     word-break: break-word;
   }
 }
+.math-block { position: relative; padding-right: 4.5rem; }
+.math-block .equation-number { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+.bibliography-block ol { padding-left: 2rem; }
+.bibliography-block ul { list-style: none; padding-left: 0; }

@@ -56,6 +56,8 @@ export type ShortcutCommandId =
   | 'insert-code-block'
   | 'insert-table'
   | 'insert-math-block'
+  | 'academic-insert-citation'
+  | 'academic-insert-equation-ref'
   | 'menu-link'
   | 'menu-clear-format';
 
@@ -144,6 +146,8 @@ export const DEFAULT_SHORTCUT_PREFERENCES: ShortcutPreferences = {
   'insert-code-block': 'Ctrl+Shift+K',
   'insert-table': 'Ctrl+Shift+T',
   'insert-math-block': 'Ctrl+Shift+M',
+  'academic-insert-citation': 'Ctrl+Shift+C',
+  'academic-insert-equation-ref': 'Ctrl+Shift+R',
   'menu-link': 'Ctrl+K',
   'menu-clear-format': 'Ctrl+\\',
 };

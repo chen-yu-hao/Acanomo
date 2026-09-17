@@ -23,6 +23,7 @@ import { serializeCallout } from './callout/calloutSerializer';
 import { TOC_END_MARKER, TOC_START_MARKER } from '../toc/tocService';
 import { splitFrontMatterBlock } from '../markdown/frontMatter';
 import { parseWithSyncAnchors, type MarkdownSyncAnchor } from './scrollSyncMapping';
+import { parseCitationKeys, serializeCitationKeys } from '../academic/academic';
 
 const markdownIt = MarkdownIt('commonmark', { html: true }).enable(['table', 'strikethrough']);
 markdownIt.validateLink = (url: string) => normalizeLinkHref(url) !== null;
@@ -43,6 +44,41 @@ markdownIt.inline.ruler.before('link', 'footnote_ref', (state, silent) => {
     token.content = id;
     token.markup = '[^]';
     token.meta = { id };
+  }
+  state.pos = end + 1;
+  return true;
+});
+
+markdownIt.inline.ruler.before('link', 'citation', (state, silent) => {
+  const src = state.src;
+  const pos = state.pos;
+  if (src.charCodeAt(pos) !== 0x5b || src.charCodeAt(pos + 1) !== 0x40) return false;
+  const end = src.indexOf(']', pos + 2);
+  if (end < 0) return false;
+  const raw = src.slice(pos + 1, end);
+  const keys = parseCitationKeys(raw);
+  if (!keys.length || raw.replace(/@([A-Za-z0-9][A-Za-z0-9_-]*)/g, '').replace(/[;\s]/g, '')) return false;
+  if (!silent) {
+    const token = state.push('citation', '', 0);
+    token.content = serializeCitationKeys(keys);
+    token.meta = { keys };
+  }
+  state.pos = end + 1;
+  return true;
+});
+
+markdownIt.inline.ruler.before('escape', 'equation_ref', (state, silent) => {
+  const src = state.src;
+  const pos = state.pos;
+  if (src.slice(pos, pos + 7) !== '\\eqref{') return false;
+  const end = src.indexOf('}', pos + 7);
+  if (end < 0) return false;
+  const label = src.slice(pos + 7, end).trim();
+  if (!label) return false;
+  if (!silent) {
+    const token = state.push('equation_ref', '', 0);
+    token.content = label;
+    token.meta = { label };
   }
   state.pos = end + 1;
   return true;
@@ -264,6 +300,19 @@ markdownIt.block.ruler.after('fence', 'math_display', (state, startLine, endLine
   return true;
 });
 
+markdownIt.block.ruler.before('reference', 'bibliography_marker', (state, startLine, _endLine, silent) => {
+  const startPos = state.bMarks[startLine] + state.tShift[startLine];
+  const lineText = state.src.slice(startPos, state.eMarks[startLine]).trim();
+  if (lineText !== '<!-- markedown:bibliography -->') return false;
+  if (!silent) {
+    const token = state.push('bibliography_block', 'div', 0);
+    token.content = lineText;
+    token.map = [startLine, startLine + 1];
+  }
+  state.line = startLine + 1;
+  return true;
+});
+
 const parseMarkdownTokens = markdownIt.parse.bind(markdownIt);
 markdownIt.parse = (src, env) => {
   const rawTokens = collapseTocTokens(parseMarkdownTokens(src, env), src);
@@ -308,6 +357,9 @@ const tableMarkdownParser = new MarkdownParser(schema, markdownIt, {
   footnote_def: { block: 'footnote_def', getAttrs: (tok: Token) => ({ id: tok.meta?.id ?? '' }) },
   math_inline: { node: 'math_inline', getAttrs: (tok: Token) => ({ tex: tok.content }) },
   math_display: { node: 'math_block', getAttrs: (tok: Token) => ({ tex: tok.content }) },
+  citation: { node: 'citation', getAttrs: (tok: Token) => ({ keys: tok.meta?.keys ?? parseCitationKeys(tok.content) }) },
+  equation_ref: { node: 'equation_ref', getAttrs: (tok: Token) => ({ label: tok.meta?.label ?? tok.content }) },
+  bibliography_block: { node: 'bibliography_block' },
   code_inline: { mark: 'code' },
   image: {
     node: 'image',
@@ -607,6 +659,17 @@ const tableMarkdownSerializer = new MarkdownSerializer(
     },
     math_inline(state, node) {
       state.write(`$${node.attrs.tex.replace(/\$/g, '\\$')}$`);
+    },
+    citation(state, node) {
+      state.write(serializeCitationKeys((node.attrs.keys as string[]) ?? []));
+    },
+    equation_ref(state, node) {
+      state.write(`\\eqref{${String(node.attrs.label ?? '')}}`);
+    },
+    bibliography_block(state, node) {
+      state.ensureNewLine();
+      state.write('<!-- markedown:bibliography -->\n');
+      state.closeBlock(node);
     },
     comment_inline(state, node) {
       state.write(serializeMarkdownComment(String(node.attrs.content ?? ''), false));
@@ -1330,6 +1393,18 @@ function serializeTableCell(cell: ProseMirrorNode): string {
       parts.push('<br>');
       return false;
     }
+    if (node.type.name === 'citation') {
+      parts.push(serializeCitationKeys((node.attrs.keys as string[]) ?? []));
+      return false;
+    }
+    if (node.type.name === 'equation_ref') {
+      parts.push(`\\eqref{${String(node.attrs.label ?? '')}}`);
+      return false;
+    }
+    if (node.type.name === 'math_inline') {
+      parts.push(`$${String(node.attrs.tex ?? '')}$`);
+      return false;
+    }
     return true;
   });
   // 表格分隔符只在最终输出时转义，不能删除正文或代码中的反斜杠。
@@ -1448,6 +1523,8 @@ function readColumnAlignment(
 export function createMarkdownInputRules() {
   return [
     createMathInlineInputRule(),
+    createCitationInputRule(),
+    createEquationRefInputRule(),
     textblockTypeInputRule(/^(#{1,6})\s$/, schema.nodes.heading, (match) => ({
       level: match[1].length,
     })),
@@ -1458,6 +1535,26 @@ export function createMarkdownInputRules() {
     textblockTypeInputRule(/^```$/, schema.nodes.code_block),
     createHorizontalRuleInputRule(),
   ];
+}
+
+function createCitationInputRule(): InputRule {
+  return new InputRule(/\[@[A-Za-z0-9_-]+(?:\s*;\s*@[A-Za-z0-9_-]+)*\]$/, (state, match, start, end) => {
+    const keys = parseCitationKeys(match[0]);
+    const tr = state.tr.replaceWith(start, end, schema.nodes.citation.create({ keys }));
+    let hasBibliography = false;
+    tr.doc.descendants((node) => {
+      if (node.type === schema.nodes.bibliography_block) hasBibliography = true;
+      return !hasBibliography;
+    });
+    if (!hasBibliography) tr.insert(tr.doc.content.size, schema.nodes.bibliography_block.create());
+    return tr;
+  });
+}
+
+function createEquationRefInputRule(): InputRule {
+  return new InputRule(/\\eqref\{([A-Za-z0-9:_-]+)\}$/, (state, match, start, end) =>
+    state.tr.replaceWith(start, end, schema.nodes.equation_ref.create({ label: match[1] })),
+  );
 }
 
 function createMathInlineInputRule(): InputRule {

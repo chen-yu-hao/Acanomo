@@ -101,6 +101,46 @@ export const schema = new Schema({
           },
         ],
       },
+      citation: {
+        inline: true,
+        group: 'inline',
+        atom: true,
+        selectable: true,
+        draggable: false,
+        attrs: {
+          keys: { default: [] },
+        },
+        toDOM(node) {
+          const keys = (node.attrs.keys as string[]).join(';');
+          return ['span', { class: 'citation-node', 'data-citation-keys': keys }, `[@${keys.replace(/;/g, '; @')}]`];
+        },
+        parseDOM: [{
+          tag: 'span.citation-node',
+          getAttrs(dom) {
+            const value = (dom as HTMLElement).getAttribute('data-citation-keys') ?? '';
+            return { keys: value.split(';').map((key) => key.trim()).filter(Boolean) };
+          },
+        }],
+      },
+      equation_ref: {
+        inline: true,
+        group: 'inline',
+        atom: true,
+        selectable: true,
+        draggable: false,
+        attrs: {
+          label: { default: '' },
+        },
+        toDOM(node) {
+          return ['a', { class: 'equation-ref', 'data-equation-label': node.attrs.label }, `\\eqref{${node.attrs.label}}`];
+        },
+        parseDOM: [{
+          tag: 'a.equation-ref',
+          getAttrs(dom) {
+            return { label: (dom as HTMLElement).getAttribute('data-equation-label') ?? '' };
+          },
+        }],
+      },
       html_block: {
         content: 'inline*',
         group: 'block',
@@ -256,6 +296,16 @@ export const schema = new Schema({
             },
           },
         ],
+      },
+      bibliography_block: {
+        atom: true,
+        selectable: true,
+        draggable: false,
+        group: 'block',
+        toDOM() {
+          return ['div', { class: 'bibliography-block', 'data-bibliography-marker': 'true' }, 'References'];
+        },
+        parseDOM: [{ tag: 'div.bibliography-block' }],
       },
       mermaid_block: {
         atom: true,

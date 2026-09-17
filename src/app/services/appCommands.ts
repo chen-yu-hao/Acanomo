@@ -19,6 +19,12 @@ export interface AppCommandHandlers {
   runCommand: (command: EditorCommand) => void;
   openTablePicker: () => void;
   openLinkPicker: () => void;
+  insertAcademicCitation?: () => void;
+  insertAcademicEquationReference?: () => void;
+  addAcademicEquationLabel?: () => void;
+  editAcademicSettings?: () => void;
+  insertAcademicBibliography?: () => void;
+  refreshAcademicData?: () => void;
   openSearchPanel: (replaceVisible?: boolean) => void;
   closeSearchPanel: () => void;
   getSearchState: () => { open: boolean; replaceVisible: boolean };
@@ -94,6 +100,18 @@ export function executeDesktopCommand(command: string, handlers: AppCommandHandl
     handlers.openTablePicker();
   } else if (command === 'insert-math-block') {
     handlers.runCommand({ type: 'insertMathBlock', tex: '' });
+  } else if (command === 'academic-insert-citation') {
+    handlers.insertAcademicCitation?.();
+  } else if (command === 'academic-insert-equation-ref') {
+    handlers.insertAcademicEquationReference?.();
+  } else if (command === 'academic-add-equation-label') {
+    handlers.addAcademicEquationLabel?.();
+  } else if (command === 'academic-document-settings') {
+    handlers.editAcademicSettings?.();
+  } else if (command === 'academic-insert-bibliography') {
+    handlers.insertAcademicBibliography?.();
+  } else if (command === 'academic-refresh-data') {
+    handlers.refreshAcademicData?.();
   } else if (command === 'insert-code-block') {
     handlers.runCommand({
       type: 'insertCodeBlock',

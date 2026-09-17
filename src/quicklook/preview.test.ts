@@ -7,6 +7,19 @@ import {
 } from './preview';
 
 describe('quicklook preview renderer', () => {
+  it('renders numbered equations, movable references and unresolved keys without losing source', () => {
+    const html = renderMarkdownPreview([
+      '---', 'citation-style: author-year', '---', '',
+      'See [@D9PGQUM4; @UNKNOWN1] and \\eqref{eq:energy}.', '',
+      '<!-- markedown:bibliography -->', '',
+      '$$', 'E=mc^2 \\label{eq:energy}', '$$',
+    ].join('\n'), { citationItems: [{ key: 'D9PGQUM4', title: 'A paper', date: '2017', creators: [{ lastName: 'Gagliardi', creatorType: 'author' }] }] });
+    expect(html).toContain('[@D9PGQUM4; @UNKNOWN1]');
+    expect(html).toContain('id="eq-eq:energy"');
+    expect(html).toContain('(1)');
+    expect(html).toContain('id="ref-D9PGQUM4"');
+    expect(html).toContain('<ul>');
+  });
   it('renders markdown with callouts, task lists, tables and math', () => {
     const html = renderMarkdownPreview(
       [

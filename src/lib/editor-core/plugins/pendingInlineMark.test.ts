@@ -760,7 +760,7 @@ describe('pendingInlineMarkPlugin', () => {
     const openWidget = getDelimiterWidget(target, 'open');
     mockRangeRect(openWidget, { left: 130, right: 150 });
 
-    const handled = plugin.props.handleDOMEvents?.click?.call(plugin, view, createClick(140, 10));
+    const handled = plugin.props.handleDOMEvents?.click?.call(plugin, view, createClick(140, 10) as PointerEvent);
 
     expect(handled).toBe(false);
     expect(view.state.selection.from).toBe(10);
@@ -795,7 +795,7 @@ describe('pendingInlineMarkPlugin', () => {
     const openWidget = getDelimiterWidget(target, 'open');
     mockRangeRect(openWidget, { left: 180, right: 240 });
 
-    const handled = plugin.props.handleDOMEvents?.click?.call(plugin, view, createClick(220, 10));
+    const handled = plugin.props.handleDOMEvents?.click?.call(plugin, view, createClick(220, 10) as PointerEvent);
 
     expect(handled).toBe(false);
     expect(view.state.selection.from).toBe(7);

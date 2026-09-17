@@ -236,7 +236,7 @@ export function cleanEditorArtifacts(htmlFragment: string): string {
     '.table-resize-handle',
     '.mermaid-block-fullscreen-button',
     '.callout-type-picker',
-    '[contenteditable="false"]:not(.image-node):not(.mermaid-block):not(.table-widget):not(.horizontal-rule-node)',
+    '[contenteditable="false"]:not(.image-node):not(.mermaid-block):not(.table-widget):not(.horizontal-rule-node):not(.math-inline):not(.math-block):not(.citation-node):not(.equation-ref):not(.bibliography-block)',
   ];
 
   for (const selector of selectorsToRemove) {

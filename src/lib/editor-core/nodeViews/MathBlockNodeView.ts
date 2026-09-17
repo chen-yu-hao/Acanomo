@@ -2,6 +2,7 @@ import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { NodeSelection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { getMathRenderer } from '../renderers';
+import { buildAcademicIndex, parseAcademicSettings, parseEquationMetadata } from '../../academic/academic';
 
 /**
  * math_block 节点的 NodeView —— 渲染态
@@ -31,6 +32,12 @@ export class MathBlockNodeView {
   private suppressNextSelectAutoEdit = false;
   // 首次创建时自动进入编辑态（如 InputRule 从 $$ 创建的空公式块）
   private needsAutoEdit = false;
+
+  static refreshAll(view: EditorView): void {
+    for (const instance of MathBlockNodeView.instances) {
+      if (instance.view === view && !instance.editing) void instance.renderKaTeX();
+    }
+  }
 
   constructor(node: ProseMirrorNode, view: EditorView, getPos: () => number) {
     this.node = node;
@@ -117,7 +124,10 @@ export class MathBlockNodeView {
   private async renderKaTeX(): Promise<void> {
     const id = ++this.renderId;
     const tex = this.node.attrs.tex as string;
+    const metadata = parseEquationMetadata(tex);
     this.dom.setAttribute('data-tex', tex);
+    if (metadata.label) this.dom.id = `eq-${metadata.label}`;
+    else this.dom.removeAttribute('id');
 
     if (this.editing) return;
 
@@ -133,13 +143,21 @@ export class MathBlockNodeView {
     }
 
     try {
-      const result = await mathRenderer.render(tex, { displayMode: true });
+      const result = await mathRenderer.render(metadata.renderTex, { displayMode: true });
       if (id !== this.renderId || this.editing) return; // 放弃过期渲染
       if (result.error) {
         this.dom.textContent = `$$\n${tex}\n$$`;
         this.dom.style.color = 'var(--md-editor-warning)';
       } else {
         this.dom.innerHTML = result.html;
+        const settings = parseAcademicSettings(String(this.view.state.doc.attrs.frontMatterPrefix ?? ''));
+        const entry = buildAcademicIndex(this.view.state.doc, settings).equations.find((candidate) => candidate.pos === this.getPos());
+        if (entry?.number) {
+          const number = document.createElement('span');
+          number.className = 'equation-number';
+          number.textContent = `(${entry.number})`;
+          this.dom.appendChild(number);
+        }
         this.dom.style.color = '';
       }
     } catch {

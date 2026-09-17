@@ -42,6 +42,9 @@
     type EditorSelectionEvent,
     type EditorThemeOptions,
   } from '../lib/editor-core';
+  import { buildAcademicIndex, parseAcademicSettings, parseCitationKeys, upsertAcademicSettings, setAcademicZoteroItems, type AcademicDocumentSettings } from '../lib/editor-core';
+  import { parseMarkdown } from '../lib/editor-core/markdown';
+  import { fetchZoteroItems, getCachedZoteroItems } from '../lib/services/zotero';
   import {
     analyzeMarkdown,
     calculateDocumentStats,
@@ -136,6 +139,7 @@
   import { createEditorSettingsController } from './services/editorSettingsController';
   import ContextMenu from './components/ContextMenu.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
+  import AcademicDialog from './components/AcademicDialog.svelte';
   import UnsavedConfirmDialog from './components/UnsavedConfirmDialog.svelte';
   import ExternalChangeDialog from './components/ExternalChangeDialog.svelte';
   import CloseWindowBehaviorDialog from './components/CloseWindowBehaviorDialog.svelte';
@@ -316,6 +320,11 @@
     filePath = '';
   let nativePath: string | null = null;
   let statusMessage = '';
+  let academicDialogMode: 'citation' | 'settings' | 'label' | 'reference' | null = null;
+  let academicSettings: AcademicDocumentSettings = parseAcademicSettings(extractFrontMatterBlock(markdown)?.raw ?? '');
+  let academicEquationLabels: string[] = [];
+  let academicFetchTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastAcademicKeys = '';
   let desktopEnabled = false;
   let recentFiles: RecentEntry[] = [];
   let missingRecentPaths = new Set<string>();
@@ -2696,6 +2705,12 @@
     runCommand: (command) => runCommand(command),
     openTablePicker: () => openTablePicker(),
     openLinkPicker: () => openLinkPicker(),
+    insertAcademicCitation: () => insertAcademicCitation(),
+    insertAcademicEquationReference: () => insertAcademicEquationReference(),
+    addAcademicEquationLabel: () => addAcademicEquationLabel(),
+    editAcademicSettings: () => editAcademicSettings(),
+    insertAcademicBibliography: () => runCommand({ type: 'insertBibliography' }),
+    refreshAcademicData: () => void refreshAcademicData(),
     openSearchPanel: (replaceVisible) => openSearchPanel(replaceVisible),
     closeSearchPanel: () => closeSearchPanel(),
     getSearchState: () =>
@@ -2729,6 +2744,93 @@
     exportHtml: () => handleExport('html'),
     exportPdf: () => handleExport('pdf'),
   };
+  setAcademicZoteroItems(getCachedZoteroItems());
+
+  function openAcademicDialog(nextMode: typeof academicDialogMode) {
+    const current = mode === 'source' ? sourceEditor?.getMarkdown() ?? markdown : editor.flushMarkdown();
+    academicSettings = parseAcademicSettings(extractFrontMatterBlock(current)?.raw ?? '');
+    academicEquationLabels = [...buildAcademicIndex(parseMarkdown(current), academicSettings).equationsByLabel.keys()];
+    academicDialogMode = nextMode;
+  }
+
+  function insertAcademicCitation() { openAcademicDialog('citation'); }
+  function applyAcademicCitation(keys: string[]) {
+    academicDialogMode = null;
+    runCommand({ type: 'insertCitation', keys });
+    runCommand({ type: 'insertBibliography' });
+    void refreshAcademicData(keys);
+  }
+
+  function insertAcademicBibliography() {
+    runCommand({ type: 'insertBibliography' });
+  }
+
+  function insertAcademicEquationReference() { openAcademicDialog('reference'); }
+  function applyAcademicEquationReference(label: string) {
+    academicDialogMode = null;
+    runCommand({ type: 'insertEquationReference', label });
+  }
+
+  function addAcademicEquationLabel() { openAcademicDialog('label'); }
+  function applyAcademicEquationLabel(label: string) {
+    academicDialogMode = null;
+    runCommand({ type: 'addEquationLabel', label });
+  }
+
+  function editAcademicSettings() { openAcademicDialog('settings'); }
+  function applyAcademicSettings(next: AcademicDocumentSettings) {
+    const current = mode === 'source' ? sourceEditor?.getMarkdown() ?? markdown : editor.flushMarkdown();
+    const currentBlock = extractFrontMatterBlock(current);
+    const nextFrontMatter = upsertAcademicSettings(currentBlock?.raw ?? '', next);
+    const nextMarkdown = currentBlock
+      ? `${nextFrontMatter}${current.slice(currentBlock.end)}`
+      : `${nextFrontMatter}\n${current}`;
+    academicDialogMode = null;
+    if (mode === 'source' && sourceEditor) sourceEditor.setMarkdown(nextMarkdown, { addToHistory: true });
+    else editor.setMarkdown(nextMarkdown, { reason: 'programmatic-update' });
+    editor.refreshSemanticView();
+  }
+
+  async function refreshAcademicData(extraKeys: string[] = []) {
+    const current = mode === 'source' ? sourceEditor?.getMarkdown() ?? markdown : editor.flushMarkdown();
+    const keys = [...new Set([
+      ...extraKeys,
+      ...Array.from(current.matchAll(/\[@([A-Za-z0-9][A-Za-z0-9_-]*)/g), (match) => match[1]),
+      ...Array.from(current.matchAll(/;\s*@([A-Za-z0-9][A-Za-z0-9_-]*)/g), (match) => match[1]),
+    ])];
+    if (!keys.length) return;
+    try {
+      const items = await fetchZoteroItems(keys);
+      setAcademicZoteroItems(getCachedZoteroItems());
+      editor.refreshSemanticView();
+      statusMessage = `已刷新 ${items.length}/${keys.length} 条文献数据`;
+    } catch (error) {
+      statusMessage = `Zotero 连接失败：${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  function scheduleAcademicMetadata(source: string) {
+    const clusters = source.match(/\[@[A-Za-z0-9_-]+(?:\s*;\s*@[A-Za-z0-9_-]+)*\]/g) ?? [];
+    const keys = [...new Set(clusters.flatMap(parseCitationKeys))];
+    const signature = keys.join(';');
+    if (signature === lastAcademicKeys) return;
+    lastAcademicKeys = signature;
+    clearTimeout(academicFetchTimer);
+    if (!keys.length) return;
+    const missing = keys.filter((key) => !getCachedZoteroItems().some((item) => item.key === key));
+    if (!missing.length) {
+      setAcademicZoteroItems(getCachedZoteroItems());
+      return;
+    }
+    academicFetchTimer = setTimeout(async () => {
+      try {
+        await fetchZoteroItems(missing);
+        setAcademicZoteroItems(getCachedZoteroItems());
+      } catch { /* Existing keys remain visible while Zotero is offline. */ }
+    }, 300);
+  }
+
+  $: scheduleAcademicMetadata(markdown);
 
   async function updateWindowTitle() {
     await updateAppWindowTitle(desktopEnabled, fileName, dirty);
@@ -3276,6 +3378,7 @@
     const activeMatch = searchMatches[searchActiveIndex];
     searchPanelOpen = false;
     clearSearchDebounceTimer();
+    clearTimeout(academicFetchTimer);
     if (getActiveEditorMode() === 'source') {
       editor.setSearchHighlights([], 0);
       if (
@@ -6467,6 +6570,12 @@
   {pendingInlineMarks}
   {openTablePicker}
   {openLinkPicker}
+  {insertAcademicCitation}
+  {insertAcademicEquationReference}
+  {addAcademicEquationLabel}
+  {editAcademicSettings}
+  {insertAcademicBibliography}
+  {refreshAcademicData}
   {openSearchPanel}
   {closeSearchPanel}
   {updateSearchQuery}
@@ -6606,6 +6715,20 @@
       onClose={closeContextMenu}
     />
   {/key}
+{/if}
+
+{#if academicDialogMode}
+  <AcademicDialog
+    mode={academicDialogMode}
+    {interfaceLocale}
+    settings={academicSettings}
+    equationLabels={academicEquationLabels}
+    onClose={() => (academicDialogMode = null)}
+    onInsert={applyAcademicCitation}
+    onSettings={applyAcademicSettings}
+    onLabel={applyAcademicEquationLabel}
+    onReference={applyAcademicEquationReference}
+  />
 {/if}
 
 <ConfirmDialog

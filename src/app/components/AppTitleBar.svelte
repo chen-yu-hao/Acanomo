@@ -63,6 +63,12 @@
   export let runCommand: (command: EditorCommand) => void;
   export let openTablePicker: () => void;
   export let openLinkPicker: () => void;
+  export let insertAcademicCitation: () => void;
+  export let insertAcademicEquationReference: () => void;
+  export let addAcademicEquationLabel: () => void;
+  export let editAcademicSettings: () => void;
+  export let insertAcademicBibliography: () => void;
+  export let refreshAcademicData: () => void;
   export let editFrontMatter: () => void;
   export let showUnavailableFeature: (featureName: string) => void;
   export let setMode: (mode: EditorViewMode) => void;
@@ -596,6 +602,20 @@
                 <button on:click={() => finish(() => runCommand({ type: 'redo' }), 'edit')}
                   >{t.redo()} <span class="shortcut">Ctrl + Y</span></button
                 >
+                <div class="divider"></div>
+                <div class="nested-trigger">
+                  <span>{t.academicMenu()}</span>
+                  <span aria-hidden="true">›</span>
+                  <div class="dropdown-menu nested" use:keepDropdownInViewport>
+                    <button on:click={() => finish(insertAcademicCitation, 'edit')}>{t.academicInsertCitation()} <span class="shortcut">Ctrl+Shift+C</span></button>
+                    <button on:click={() => finish(insertAcademicEquationReference, 'edit')}>{t.academicInsertEquationRef()} <span class="shortcut">Ctrl+Shift+R</span></button>
+                    <button on:click={() => finish(addAcademicEquationLabel, 'edit')}>{t.academicAddLabel()}</button>
+                    <button on:click={() => finish(editAcademicSettings, 'edit')}>{t.academicSettings()}</button>
+                    <button on:click={() => finish(insertAcademicBibliography, 'edit')}>{t.academicBibliography()}</button>
+                    <div class="divider"></div>
+                    <button on:click={() => finish(refreshAcademicData, 'edit')}>{t.academicRefresh()}</button>
+                  </div>
+                </div>
               </div>
             {/if}
           </div>

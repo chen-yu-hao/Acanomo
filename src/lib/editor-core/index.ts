@@ -42,3 +42,6 @@ export type {
   ContextMenuTarget,
   ContextMenuTargetKind,
 } from './plugins/contextMenu';
+export type { AcademicDocumentSettings, AcademicIndex, CitationStyle, EquationNumberingMode, EquationEntry, EquationMetadata, ZoteroItem } from '../academic/academic';
+export { DEFAULT_ACADEMIC_SETTINGS, buildAcademicIndex, formatBibliography, formatCitation, parseAcademicSettings, parseCitationKeys, parseEquationMetadata, serializeCitationKeys, upsertAcademicSettings } from '../academic/academic';
+export { setAcademicZoteroItems } from './nodeViews/AcademicNodeViews';

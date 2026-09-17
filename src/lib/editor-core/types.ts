@@ -160,6 +160,10 @@ export type EditorCommand =
   | { type: 'insertCommentBlock'; content?: string }
   | { type: 'insertCodeBlock'; language?: string; code?: string }
   | { type: 'insertMathBlock'; tex?: string }
+  | { type: 'insertCitation'; keys: string[] }
+  | { type: 'insertEquationReference'; label: string }
+  | { type: 'addEquationLabel'; label: string }
+  | { type: 'insertBibliography' }
   | { type: 'insertMermaidBlock'; code?: string }
   | { type: 'insertDiagramBlock'; diagramType: DiagramType }
   | { type: 'insertToc' }

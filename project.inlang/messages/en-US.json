@@ -153,5 +153,12 @@
   "applyLink": "Apply link",
   "removeLink": "Remove link",
   "closeLinkEditor": "Close link editor",
-  "interfaceLanguageJaJp": "Japanese"
+  "interfaceLanguageJaJp": "Japanese",
+  "academicMenu": "Academic Citations",
+  "academicInsertCitation": "Insert Citation...",
+  "academicInsertEquationRef": "Insert Equation Reference...",
+  "academicAddLabel": "Label Current Equation",
+  "academicSettings": "Document Numbering...",
+  "academicBibliography": "Insert Bibliography",
+  "academicRefresh": "Refresh References"
 }

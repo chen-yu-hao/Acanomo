@@ -3044,3 +3044,11 @@
   outline: 2px solid var(--md-editor-accent);
   /* outline-offset: 1px; */
 }
+.math-block { position: relative; padding-right: 4.5rem; }
+.math-block .equation-number { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--md-editor-muted, #68707a); font-variant-numeric: tabular-nums; }
+.citation-node, .equation-ref { color: var(--md-editor-link, #116d8f); cursor: pointer; }
+.citation-node.is-unresolved, .equation-ref.is-unresolved, .bibliography-block .is-unresolved { color: #b42318; }
+.bibliography-block { margin: 1.5rem 0; }
+.bibliography-block ol { padding-left: 2rem; }
+.bibliography-block ul { list-style: none; padding-left: 0; }
+.bibliography-block li { margin: 0.4rem 0; }

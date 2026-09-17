@@ -3,6 +3,7 @@ import type { EditorCommand, EditorCore, EditorMode } from '../../lib/editor-cor
 import type { OutlineItem } from '../../lib/outline/outlineService';
 import type { MarkdownSourceEditorHandle } from '../components/markdownSourceEditor';
 import { createTocBlock } from '../../lib/toc/tocService';
+import { serializeCitationKeys } from '../../lib/academic/academic';
 import { t } from '../i18n';
 import {
   type OutlineScrollAnchor,
@@ -138,9 +139,64 @@ export function createEditorInteractionController(options: EditorInteractionOpti
       insertTocAtSourceSelection();
       return;
     }
+    if (options.getMode() === 'source') {
+      if (command.type === 'insertCitation') {
+        insertAcademicAtSourceSelection(serializeCitationKeys(command.keys), false);
+        return;
+      }
+      if (command.type === 'insertEquationReference') {
+        insertAcademicAtSourceSelection(`\\eqref{${command.label}}`, false);
+        return;
+      }
+      if (command.type === 'insertBibliography') {
+        insertAcademicAtSourceSelection('<!-- markedown:bibliography -->', true);
+        return;
+      }
+      if (command.type === 'addEquationLabel') {
+        addEquationLabelAtSourceSelection(command.label);
+        return;
+      }
+    }
 
     options.getEditor().execute(command);
     options.getEditor().focus();
+  }
+
+  function insertAcademicAtSourceSelection(value: string, atEnd: boolean) {
+    const sourceEditor = options.getSourceEditor();
+    if (!sourceEditor) return;
+    const markdown = sourceEditor.getMarkdown();
+    if (atEnd && markdown.includes('<!-- markedown:bibliography -->')) return;
+    const selection = sourceEditor.getSelection();
+    const start = atEnd ? markdown.length : selection.from;
+    const end = atEnd ? markdown.length : selection.to;
+    const insertion = atEnd ? `${markdown.trimEnd() ? '\n\n' : ''}${value}\n` : value;
+    const updated = `${markdown.slice(0, start)}${insertion}${markdown.slice(end)}`;
+    sourceEditor.setMarkdown(updated, { addToHistory: true });
+    if (atEnd) return;
+    requestAnimationFrame(() => {
+      sourceEditor.focus();
+      sourceEditor.setSelection(start + insertion.length);
+    });
+  }
+
+  function addEquationLabelAtSourceSelection(label: string) {
+    const sourceEditor = options.getSourceEditor();
+    if (!sourceEditor || !/^[A-Za-z0-9:_-]+$/.test(label)) return;
+    const markdown = sourceEditor.getMarkdown();
+    const caret = sourceEditor.getSelection().from;
+    const candidates = [...markdown.matchAll(/\$\$[\s\S]*?\$\$|(?<!\$)\$(?!\$)[^\n$]+\$(?!\$)/g)];
+    const match = candidates.find((candidate) => candidate.index <= caret && caret <= candidate.index + candidate[0].length);
+    if (!match) return;
+    const source = match[0];
+    const delimiter = source.startsWith('$$') ? '$$' : '$';
+    const tex = source.slice(delimiter.length, -delimiter.length).replace(/\\label\{[^{}]+\}/g, '').trimEnd();
+    const updatedFormula = `${delimiter}${tex}${delimiter === '$$' ? '\n' : ' '}\\label{${label}}${delimiter}`;
+    sourceEditor.setMarkdown(`${markdown.slice(0, match.index)}${updatedFormula}${markdown.slice(match.index + source.length)}`, { addToHistory: true });
+    requestAnimationFrame(() => {
+      sourceEditor.focus();
+      sourceEditor.setSelection(match.index + updatedFormula.length - delimiter.length);
+    });
   }
 
   function insertTocAtSourceSelection() {

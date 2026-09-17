@@ -32,6 +32,7 @@ import { MermaidBlockNodeView } from './nodeViews/MermaidBlockNodeView';
 import { CalloutNodeView } from './nodeViews/CalloutNodeView';
 import { HorizontalRuleNodeView } from './nodeViews/HorizontalRuleNodeView';
 import { TocBlockNodeView } from './nodeViews/TocBlockNodeView';
+import { BibliographyNodeView, CitationNodeView, EquationRefNodeView, refreshAcademicNodeViews } from './nodeViews/AcademicNodeViews';
 import {
   executeEditorCommand,
   insertSoftLineBreak,
@@ -261,6 +262,9 @@ export class ProseMirrorEditorCore implements EditorCore {
           new MathInlineNodeView(node, view, getPos as () => number),
         math_block: (node, view, getPos) =>
           new MathBlockNodeView(node, view, getPos as () => number),
+        citation: (node, view) => new CitationNodeView(node, view),
+        equation_ref: (node, view) => new EquationRefNodeView(node, view),
+        bibliography_block: (node, view) => new BibliographyNodeView(node, view),
         mermaid_block: (node, view, getPos) =>
           new MermaidBlockNodeView(node, view, getPos as () => number),
         callout: (node, view, getPos) => new CalloutNodeView(node, view, getPos as () => number),
@@ -1380,6 +1384,10 @@ export class ProseMirrorEditorCore implements EditorCore {
     const previousSelection = this.view.state.selection;
     const nextState = this.view.state.apply(transaction);
     this.view.updateState(nextState);
+    if (transaction.docChanged) {
+      refreshAcademicNodeViews(this.view);
+      MathBlockNodeView.refreshAll(this.view);
+    }
 
     if (isSemanticBlockAlignmentTransaction(transaction)) {
       return;
