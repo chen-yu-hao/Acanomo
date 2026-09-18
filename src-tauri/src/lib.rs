@@ -3,6 +3,7 @@ mod config;
 mod export;
 mod external_link;
 mod file_system;
+mod git_review;
 mod i18n;
 mod models;
 mod pdf_outline;
@@ -296,6 +297,11 @@ pub fn run() {
             crate::file_system::read_markdown_file,
             crate::file_system::write_markdown_file,
             crate::file_system::write_markdown_file_with_encoding,
+            crate::git_review::git_review_start,
+            crate::git_review::git_review_refresh,
+            crate::git_review::git_review_accept_hunk,
+            crate::git_review::git_review_accept_all,
+            crate::git_review::git_review_reject,
             crate::text_document::commands::open_segmented_document,
             crate::text_document::commands::reload_segmented_session,
             crate::text_document::commands::read_segmented_window,

@@ -5,6 +5,7 @@
     EditorState,
     StateEffect,
     StateField,
+    RangeSetBuilder,
     Transaction,
   } from '@codemirror/state';
   import {
@@ -18,6 +19,7 @@
   import { onDestroy, onMount } from 'svelte';
   import type { BlockAlignmentAnchor } from '../services/markdownBlockAlignment';
   import { getSourceTextChanges, type MarkdownSourceEditorHandle } from './markdownSourceEditor';
+  import type { ReviewDiff } from '../../lib/review/review';
 
   export let markdown: string;
   export let documentId = '';
@@ -30,6 +32,7 @@
   export let onReady: (handle: MarkdownSourceEditorHandle) => void = () => undefined;
   export let onLayoutChange: () => void = () => undefined;
   export let sourceEditor: MarkdownSourceEditorHandle;
+  export let reviewDiff: ReviewDiff | null = null;
 
   interface SourceSpacerSpec {
     key: string;
@@ -66,6 +69,12 @@
   }
 
   const setSourceSpacers = StateEffect.define<readonly SourceSpacerSpec[]>();
+  interface ReviewDecorationSpec {
+    line: number;
+    kind: 'added' | 'deleted';
+    text?: string;
+  }
+  const setReviewDecorations = StateEffect.define<readonly ReviewDecorationSpec[]>();
   const sourceSpacerField = StateField.define<DecorationSet>({
     create: () => Decoration.none,
     update(value, transaction) {
@@ -82,6 +91,53 @@
           ),
           true,
         );
+      }
+      return next;
+    },
+    provide: (field) => EditorView.decorations.from(field),
+  });
+
+  class ReviewDeletedWidget extends WidgetType {
+    readonly text: string;
+    constructor(text: string) { super(); this.text = text; }
+    eq(other: ReviewDeletedWidget) { return other.text === this.text; }
+    toDOM() {
+      const node = document.createElement('div');
+      node.className = 'review-deleted-line';
+      node.textContent = this.text || ' ';
+      node.setAttribute('aria-label', `Deleted: ${this.text}`);
+      return node;
+    }
+  }
+
+  const reviewDecorationField = StateField.define<DecorationSet>({
+    create: () => Decoration.none,
+    update(value, transaction) {
+      let next = value.map(transaction.changes);
+      for (const effect of transaction.effects) {
+        if (!effect.is(setReviewDecorations)) continue;
+        const decorations = new RangeSetBuilder<Decoration>();
+        for (const spec of effect.value) {
+          const lineNumber = Math.max(1, Math.min(spec.line, transaction.state.doc.lines));
+          const line = transaction.state.doc.line(lineNumber);
+          const position = spec.kind === 'deleted' && spec.line > transaction.state.doc.lines
+            ? transaction.state.doc.length
+            : line.from;
+          if (spec.kind === 'added') {
+            decorations.add(position, position, Decoration.line({ class: 'review-added-line' }));
+          } else {
+            decorations.add(
+              position,
+              position,
+              Decoration.widget({
+                widget: new ReviewDeletedWidget(spec.text ?? ''),
+                block: true,
+                side: -1,
+              }),
+            );
+          }
+        }
+        next = decorations.finish();
       }
       return next;
     },
@@ -109,6 +165,7 @@
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.lineWrapping,
           sourceSpacerField,
+          reviewDecorationField,
           readonlyCompartment.of(EditorView.editable.of(!readonlyDocumentMode)),
           EditorView.contentAttributes.of({ spellcheck: 'false', autocapitalize: 'off' }),
           EditorView.domEventHandlers({
@@ -179,7 +236,11 @@
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: markdown },
         selection: { anchor: 0 },
-        effects: [historyCompartment.reconfigure([]), setSourceSpacers.of([])],
+        effects: [
+          historyCompartment.reconfigure([]),
+          setSourceSpacers.of([]),
+          setReviewDecorations.of([]),
+        ],
         annotations: Transaction.addToHistory.of(false),
       });
       view.dispatch({ effects: historyCompartment.reconfigure(history()) });
@@ -198,6 +259,15 @@
     view.dispatch({
       effects: readonlyCompartment.reconfigure(EditorView.editable.of(!readonlyDocumentMode)),
     });
+  }
+
+  $: if (view) {
+    const specs: ReviewDecorationSpec[] = [];
+    for (const line of reviewDiff?.addedLines ?? []) specs.push({ line, kind: 'added' });
+    for (const deleted of reviewDiff?.deletedLines ?? []) {
+      specs.push({ line: deleted.line, kind: 'deleted', text: deleted.text });
+    }
+    view.dispatch({ effects: setReviewDecorations.of(specs) });
   }
 
   function createHandle(): MarkdownSourceEditorHandle {

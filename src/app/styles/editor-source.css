@@ -62,3 +62,27 @@
   pointer-events: none;
   user-select: none;
 }
+
+/* Review mode keeps the editor text black/foreground while using restrained
+   theme-aware accents for additions and deletions. */
+.source-editor .cm-line.review-added-line {
+  color: var(--md-editor-fg);
+  text-decoration-line: underline;
+  text-decoration-color: var(--md-review-added, #2563eb);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.source-editor .review-deleted-line {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 1.75em;
+  padding: 0 0.5rem;
+  color: var(--md-editor-fg);
+  background: color-mix(in srgb, var(--md-review-deleted, #dc2626) 9%, transparent);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--md-review-deleted, #dc2626);
+  text-decoration-thickness: 2px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

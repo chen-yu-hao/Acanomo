@@ -243,6 +243,13 @@ fn build_edit_menu<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::menu::Submen
         .item(&menu_item(app, "academic-refresh-data", tr(locale, "menu_academic_refresh"), None)?)
         .build()
         .map_err(|e| e.to_string())?;
+    let review_menu = SubmenuBuilder::new(app, tr(locale, "menu_review"))
+        .item(&menu_item(app, "review-toggle", tr(locale, "menu_review_toggle"), Some("CmdOrCtrl+Shift+Y"))?)
+        .item(&menu_item(app, "review-accept-current", tr(locale, "menu_review_accept_current"), None)?)
+        .item(&menu_item(app, "review-accept-all", tr(locale, "menu_review_accept_all"), None)?)
+        .item(&menu_item(app, "review-reject", tr(locale, "menu_review_reject"), None)?)
+        .build()
+        .map_err(|e| e.to_string())?;
     SubmenuBuilder::new(app, tr(locale, "menu_edit"))
         .item(&menu_item(
             app,
@@ -261,6 +268,8 @@ fn build_edit_menu<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::menu::Submen
         .copy()
         .paste()
         .select_all()
+        .separator()
+        .item(&review_menu)
         .separator()
         .item(&academic_menu)
         .build()

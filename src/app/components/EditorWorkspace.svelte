@@ -22,6 +22,8 @@
   import { syncEditorPanes } from '../services/markdownScrollSyncWorkspace';
   import { t } from '../i18n';
   import type { EditorViewMode, SplitActivePane, SplitViewLayout } from '../types';
+  import type { ReviewDiff, ReviewHunk } from '../../lib/review/review';
+  import ReviewPanel from './ReviewPanel.svelte';
 
   export let interfaceLocale: string;
   export let mode: EditorViewMode;
@@ -76,6 +78,16 @@
   }) => boolean;
   export let onSourceScroll: (() => void) | undefined = undefined;
   export let onSemanticScroll: (() => void) | undefined = undefined;
+  export let reviewDiff: ReviewDiff | null = null;
+  export let reviewBaselineCommit = '';
+  export let reviewRepoRoot = '';
+  export let reviewBusy = false;
+  export let acceptReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
+  export let acceptAllReview: () => void = () => undefined;
+  export let rejectReview: () => void = () => undefined;
+  export let refreshReview: () => void = () => undefined;
+  export let closeReview: () => void = () => undefined;
+  export let selectReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
 
   interface PendingOutlineDrag {
     pointerId: number;
@@ -782,6 +794,7 @@
 />
 
 {#key interfaceLocale}
+  <div class="editor-review-layout" class:review-active={reviewDiff !== null}>
   <div
     bind:this={editorGrid}
     class="editor-grid"
@@ -822,6 +835,7 @@
           {markdown}
           documentId={sourceDocumentId}
           {readonlyDocumentMode}
+          {reviewDiff}
           onMarkdownChange={updateMarkdown}
           onSelectionChange={(selected) => {
             onSourceSelectionChange(selected);
@@ -1010,5 +1024,21 @@
         {/if}
       </aside>
     {/if}
+  </div>
+  {#if reviewDiff}
+    <ReviewPanel
+      diff={reviewDiff}
+      {interfaceLocale}
+      baselineCommit={reviewBaselineCommit}
+      repoRoot={reviewRepoRoot}
+      busy={reviewBusy}
+      onAcceptHunk={acceptReviewHunk}
+      onAcceptAll={acceptAllReview}
+      onReject={rejectReview}
+      onRefresh={refreshReview}
+      onClose={closeReview}
+      onSelectionChange={selectReviewHunk}
+    />
+  {/if}
   </div>
 {/key}

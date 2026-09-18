@@ -23,6 +23,12 @@
     type RecentEntry,
     type RecentEntryType,
     clearRecentEntries,
+    startGitReview,
+    refreshGitReview,
+    acceptGitReviewHunk,
+    acceptAllGitReview,
+    rejectGitReview,
+    type GitReviewPayload,
   } from '../lib/desktop/tauriStorage';
   import {
     createEditorCore,
@@ -43,8 +49,9 @@
     type EditorThemeOptions,
   } from '../lib/editor-core';
   import { buildAcademicIndex, parseAcademicSettings, parseCitationKeys, upsertAcademicSettings, setAcademicZoteroItems, type AcademicDocumentSettings } from '../lib/editor-core';
-  import { parseMarkdown } from '../lib/editor-core/markdown';
+import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markdown';
   import { fetchZoteroItems, getCachedZoteroItems } from '../lib/services/zotero';
+  import { buildUnifiedPatch, computeReviewDiff, type ReviewDiff, type ReviewHunk } from '../lib/review/review';
   import {
     analyzeMarkdown,
     calculateDocumentStats,
@@ -325,6 +332,15 @@
   let academicEquationLabels: string[] = [];
   let academicFetchTimer: ReturnType<typeof setTimeout> | undefined;
   let lastAcademicKeys = '';
+  let reviewMode = false;
+  let reviewBaseline = '';
+  let reviewBaselineCommit = '';
+  let reviewRepoRoot = '';
+  let reviewRelativePath = '';
+  let reviewDiff: ReviewDiff | null = null;
+  let reviewSelectedHunkId = '';
+  let reviewBusy = false;
+  let reviewRefreshTimer: number | null = null;
   let desktopEnabled = false;
   let recentFiles: RecentEntry[] = [];
   let missingRecentPaths = new Set<string>();
@@ -1502,6 +1518,7 @@
 
   // 加载指定 Tab 的状态并更新编辑器
   function loadTabState(tab: Tab) {
+    if (reviewMode) closeReviewMode();
     clearSplitSemanticRefreshTimer();
     splitSemanticRefreshGeneration += 1;
     clearReadingPositionSaveTimer();
@@ -2636,6 +2653,7 @@
     if (persistPreference) {
       persistEditorModePreference(nextMode);
     }
+    if (reviewMode) syncSemanticReviewDecorations();
     return true;
   }
 
@@ -2711,6 +2729,10 @@
     editAcademicSettings: () => editAcademicSettings(),
     insertAcademicBibliography: () => runCommand({ type: 'insertBibliography' }),
     refreshAcademicData: () => void refreshAcademicData(),
+    toggleReviewMode: () => void toggleReviewMode(),
+    acceptReviewHunk: () => void acceptSelectedReviewHunk(),
+    acceptAllReview: () => void acceptAllReviewChanges(),
+    rejectReview: () => void rejectReviewChanges(),
     openSearchPanel: (replaceVisible) => openSearchPanel(replaceVisible),
     closeSearchPanel: () => closeSearchPanel(),
     getSearchState: () =>
@@ -2806,6 +2828,220 @@
       statusMessage = `已刷新 ${items.length}/${keys.length} 条文献数据`;
     } catch (error) {
       statusMessage = `Zotero 连接失败：${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  function reviewCurrentMarkdown() {
+    if (mode === 'source') return sourceEditor?.getMarkdown() ?? markdown;
+    return editor.flushMarkdown();
+  }
+
+  function updateReviewDiff() {
+    if (!reviewMode) {
+      reviewDiff = null;
+      return;
+    }
+    reviewDiff = computeReviewDiff(reviewBaseline, reviewCurrentMarkdown());
+    syncSemanticReviewDecorations();
+  }
+
+  function syncSemanticReviewDecorations() {
+    if (!editorHost) return;
+    requestAnimationFrame(() => {
+      const proseMirror = editorHost.querySelector<HTMLElement>('.ProseMirror');
+      if (!proseMirror) return;
+      const blocks = Array.from(proseMirror.children).filter(
+        (node): node is HTMLElement => node instanceof HTMLElement,
+      );
+      blocks.forEach((block) => block.classList.remove('review-semantic-added'));
+      if (!reviewMode || !reviewDiff) return;
+      const mappings = getMarkdownBlockLineMap(reviewCurrentMarkdown());
+      for (const hunk of reviewDiff.hunks) {
+        if (hunk.kind === 'delete') continue;
+        for (const mapping of mappings) {
+          if (mapping.nodeIndex >= blocks.length) continue;
+          if (mapping.toLine < hunk.currentStart || mapping.fromLine > hunk.currentEnd) continue;
+          blocks[mapping.nodeIndex]?.classList.add('review-semantic-added');
+        }
+      }
+    });
+  }
+
+  function clearReviewRefreshTimer() {
+    if (reviewRefreshTimer !== null) {
+      window.clearInterval(reviewRefreshTimer);
+      reviewRefreshTimer = null;
+    }
+  }
+
+  function closeReviewMode() {
+    clearReviewRefreshTimer();
+    reviewMode = false;
+    reviewBaseline = '';
+    reviewBaselineCommit = '';
+    reviewRepoRoot = '';
+    reviewRelativePath = '';
+    reviewDiff = null;
+    reviewSelectedHunkId = '';
+  }
+
+  function applyGitReviewPayload(payload: GitReviewPayload) {
+    if (payload.baselineContent !== null) reviewBaseline = payload.baselineContent;
+    if (payload.baselineCommit) reviewBaselineCommit = payload.baselineCommit;
+    if (payload.repoRoot) reviewRepoRoot = payload.repoRoot;
+    if (payload.relativePath) reviewRelativePath = payload.relativePath;
+    updateReviewDiff();
+    if (!reviewDiff?.hunks.some((hunk) => hunk.id === reviewSelectedHunkId)) {
+      reviewSelectedHunkId = reviewDiff?.hunks[0]?.id ?? '';
+    }
+  }
+
+  async function toggleReviewMode() {
+    if (reviewMode) {
+      closeReviewMode();
+      return;
+    }
+    if (!desktopEnabled || !nativePath || !isMarkdownTab(tabs.find((tab) => tab.id === activeTabId))) {
+      statusMessage = '审阅模式需要一个已保存的 Markdown 文件。';
+      return;
+    }
+    if (dirty && !(await saveMarkdownFile(false))) return;
+    reviewBusy = true;
+    try {
+      let payload = await startGitReview(nativePath, false);
+      if (payload.state === 'requires-init') {
+        const createRepo = await confirmAction(
+          '当前文件不在 Git 工作区内。是否在当前目录创建 Git 仓库并建立审阅基线？',
+          { title: '启用审阅模式', okLabel: '创建仓库', cancelLabel: t.cancel() },
+        );
+        if (createRepo !== true) return;
+        payload = await startGitReview(nativePath, true);
+      }
+      if (!payload.baselineCommit || payload.baselineContent === null) {
+        throw new Error('无法读取 Git 审阅基线。');
+      }
+      reviewMode = true;
+      applyGitReviewPayload(payload);
+      clearReviewRefreshTimer();
+      reviewRefreshTimer = window.setInterval(() => void refreshReviewBaseline(), 5000);
+      statusMessage = '已启用 Git 审阅模式';
+    } catch (error) {
+      showVisibleError(error, '启用审阅模式失败');
+    } finally {
+      reviewBusy = false;
+    }
+  }
+
+  async function refreshReviewBaseline() {
+    if (!reviewMode || !nativePath || !reviewBaselineCommit) return;
+    try {
+      const payload = await refreshGitReview(nativePath, reviewBaselineCommit);
+      if (payload.headChanged) {
+        applyGitReviewPayload(payload);
+      }
+    } catch (error) {
+      statusMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  function collectReviewAssets(source: string): string[] {
+    if (!nativePath) return [];
+    const directory = nativePath.slice(0, Math.max(nativePath.lastIndexOf('/'), nativePath.lastIndexOf('\\')));
+    const assets: string[] = [];
+    for (const match of source.matchAll(/!\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))/g)) {
+      const raw = (match[1] ?? match[2] ?? '').trim();
+      if (!raw || /^(?:[a-z]+:|\/\/|data:)/i.test(raw)) continue;
+      const path = /^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith('/')
+        ? raw
+        : `${directory}/${raw}`.replace(/\\/g, '/');
+      assets.push(path);
+    }
+    return [...new Set(assets)];
+  }
+
+  async function acceptReviewHunk(hunk: ReviewHunk | undefined) {
+    if (!reviewMode || !nativePath || !reviewDiff || !hunk) return;
+    if (dirty && !(await saveMarkdownFile(false))) return;
+    reviewBusy = true;
+    try {
+      const current = reviewCurrentMarkdown();
+      const patch = buildUnifiedPatch(reviewRelativePath, reviewBaseline, current, hunk);
+      const payload = await acceptGitReviewHunk(
+        nativePath,
+        patch,
+        reviewBaselineCommit,
+        `Markit review: accept change in ${fileName}`,
+        collectReviewAssets(`${hunk.oldLines.join('')}\n${hunk.newLines.join('')}`),
+      );
+      applyGitReviewPayload(payload);
+      statusMessage = '已接受所选审阅修改';
+    } catch (error) {
+      showVisibleError(error, '接受审阅修改失败');
+    } finally {
+      reviewBusy = false;
+    }
+  }
+
+  function acceptSelectedReviewHunk() {
+    void acceptReviewHunk(
+      reviewDiff?.hunks.find((hunk) => hunk.id === reviewSelectedHunkId) ?? reviewDiff?.hunks[0],
+    );
+  }
+
+  function selectReviewHunk(hunk: ReviewHunk) {
+    reviewSelectedHunkId = hunk.id;
+  }
+
+  async function acceptAllReviewChanges() {
+    if (!reviewMode || !nativePath || !reviewDiff?.changed) return;
+    if (dirty && !(await saveMarkdownFile(false))) return;
+    reviewBusy = true;
+    try {
+      const payload = await acceptAllGitReview(
+        nativePath,
+        reviewBaselineCommit,
+        collectReviewAssets(`${reviewBaseline}\n${reviewCurrentMarkdown()}`),
+        `Markit review: accept all changes in ${fileName}`,
+      );
+      applyGitReviewPayload(payload);
+      statusMessage = '已接受全部审阅修改';
+    } catch (error) {
+      showVisibleError(error, '接受全部审阅修改失败');
+    } finally {
+      reviewBusy = false;
+    }
+  }
+
+  async function rejectReviewChanges() {
+    if (!reviewMode || !nativePath) return;
+    reviewBusy = true;
+    try {
+      await rejectGitReview(nativePath, collectReviewAssets(`${reviewBaseline}\n${reviewCurrentMarkdown()}`));
+      const restored = await readMarkdownFromPath(nativePath, '读取回滚后的文档失败');
+      if (!restored.document) throw new Error(restored.error);
+      const next = restored.document.markdown;
+      markdown = next;
+      savedMarkdown = next;
+      dirty = false;
+      lastKnownModifiedAt = restored.document.modifiedAt;
+      const activeTab = tabs.find((tab) => tab.id === activeTabId);
+      if (isMarkdownTab(activeTab)) {
+        activeTab.markdown = next;
+        activeTab.savedMarkdown = next;
+        activeTab.dirty = false;
+        activeTab.lastKnownModifiedAt = restored.document.modifiedAt;
+        activeTab.encoding = restored.document.encoding;
+        tabs = [...tabs];
+      }
+      editor.setMarkdown(next, { reason: 'programmatic-update', dirty: false, savedMarkdown: next });
+      sourceEditor?.setMarkdown(next, { addToHistory: false });
+      await refreshReviewBaseline();
+      updateReviewDiff();
+      statusMessage = '已根据暂存区回滚工作区';
+    } catch (error) {
+      showVisibleError(error, '回滚审阅修改失败');
+    } finally {
+      reviewBusy = false;
     }
   }
 
@@ -5595,6 +5831,7 @@
     if (toastTimer !== null) window.clearTimeout(toastTimer);
     if (linkOpeningTimer !== null) window.clearTimeout(linkOpeningTimer);
     if (softwareUpdateStartupTimer !== null) window.clearTimeout(softwareUpdateStartupTimer);
+    clearReviewRefreshTimer();
     clearSplitSemanticRefreshTimer();
     clearContentAnalysisTimer();
     clearSearchDebounceTimer();
@@ -5650,6 +5887,10 @@
     }
 
     markdown = event.markdown;
+    if (reviewMode) {
+      reviewDiff = computeReviewDiff(reviewBaseline, event.markdown);
+      syncSemanticReviewDecorations();
+    }
     if (event.reason === 'source-input') {
       scheduleMarkdownAnalysis(event.markdown);
     } else {
@@ -6576,6 +6817,16 @@
   {editAcademicSettings}
   {insertAcademicBibliography}
   {refreshAcademicData}
+  {reviewDiff}
+  reviewBaselineCommit={reviewBaselineCommit}
+  reviewRepoRoot={reviewRepoRoot}
+  reviewBusy={reviewBusy}
+  acceptReviewHunk={(hunk: ReviewHunk) => void acceptReviewHunk(hunk)}
+  acceptAllReview={() => void acceptAllReviewChanges()}
+  rejectReview={() => void rejectReviewChanges()}
+  refreshReview={() => void refreshReviewBaseline()}
+  closeReview={closeReviewMode}
+  selectReviewHunk={(hunk: ReviewHunk) => selectReviewHunk(hunk)}
   {openSearchPanel}
   {closeSearchPanel}
   {updateSearchQuery}

@@ -25,6 +25,10 @@ export interface AppCommandHandlers {
   editAcademicSettings?: () => void;
   insertAcademicBibliography?: () => void;
   refreshAcademicData?: () => void;
+  toggleReviewMode?: () => void;
+  acceptReviewHunk?: () => void;
+  acceptAllReview?: () => void;
+  rejectReview?: () => void;
   openSearchPanel: (replaceVisible?: boolean) => void;
   closeSearchPanel: () => void;
   getSearchState: () => { open: boolean; replaceVisible: boolean };
@@ -112,6 +116,14 @@ export function executeDesktopCommand(command: string, handlers: AppCommandHandl
     handlers.insertAcademicBibliography?.();
   } else if (command === 'academic-refresh-data') {
     handlers.refreshAcademicData?.();
+  } else if (command === 'review-toggle') {
+    handlers.toggleReviewMode?.();
+  } else if (command === 'review-accept-current') {
+    handlers.acceptReviewHunk?.();
+  } else if (command === 'review-accept-all') {
+    handlers.acceptAllReview?.();
+  } else if (command === 'review-reject') {
+    handlers.rejectReview?.();
   } else if (command === 'insert-code-block') {
     handlers.runCommand({
       type: 'insertCodeBlock',

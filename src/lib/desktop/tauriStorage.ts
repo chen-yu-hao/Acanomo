@@ -51,6 +51,16 @@ export interface SnapshotRecord {
   reason: string;
 }
 
+export interface GitReviewPayload {
+  state: 'ready' | 'requires-init';
+  repoRoot: string | null;
+  relativePath: string | null;
+  baselineCommit: string | null;
+  baselineContent: string | null;
+  headChanged: boolean;
+  committed: boolean;
+}
+
 export interface WorkspaceDraftRecord {
   draftId: string;
   markdown: string;
@@ -167,6 +177,16 @@ interface ExportResultPayload {
 interface Base64FileResultPayload {
   data_url: string;
   mime_type: string;
+}
+
+interface GitReviewPayloadWire {
+  state: GitReviewPayload['state'];
+  repo_root?: string | null;
+  relative_path?: string | null;
+  baseline_commit?: string | null;
+  baseline_content?: string | null;
+  head_changed?: boolean;
+  committed?: boolean;
 }
 
 export function isTauriRuntime(): boolean {
@@ -293,6 +313,70 @@ export async function saveMarkdownNative(
     sizeBytes: document.sizeBytes,
   });
   return document;
+}
+
+function normalizeGitReviewPayload(payload: GitReviewPayloadWire): GitReviewPayload {
+  return {
+    state: payload.state === 'requires-init' ? 'requires-init' : 'ready',
+    repoRoot: payload.repo_root ?? null,
+    relativePath: payload.relative_path ?? null,
+    baselineCommit: payload.baseline_commit ?? null,
+    baselineContent: payload.baseline_content ?? null,
+    headChanged: Boolean(payload.head_changed),
+    committed: Boolean(payload.committed),
+  };
+}
+
+export async function startGitReview(path: string, createRepo = false): Promise<GitReviewPayload> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return normalizeGitReviewPayload(
+    await invoke<GitReviewPayloadWire>('git_review_start', {
+      input: { path, create_repo: createRepo },
+    }),
+  );
+}
+
+export async function refreshGitReview(path: string, baselineCommit: string): Promise<GitReviewPayload> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return normalizeGitReviewPayload(
+    await invoke<GitReviewPayloadWire>('git_review_refresh', {
+      input: { path, baseline_commit: baselineCommit },
+    }),
+  );
+}
+
+export async function acceptGitReviewHunk(
+  path: string,
+  patch: string,
+  expectedCommit: string,
+  message: string,
+  assets: string[] = [],
+): Promise<GitReviewPayload> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return normalizeGitReviewPayload(
+    await invoke<GitReviewPayloadWire>('git_review_accept_hunk', {
+      input: { path, patch, expected_commit: expectedCommit, message, assets },
+    }),
+  );
+}
+
+export async function acceptAllGitReview(
+  path: string,
+  expectedCommit: string,
+  assets: string[],
+  message: string,
+): Promise<GitReviewPayload> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return normalizeGitReviewPayload(
+    await invoke<GitReviewPayloadWire>('git_review_accept_all', {
+      input: { path, expected_commit: expectedCommit, assets, message },
+    }),
+  );
+}
+
+export async function rejectGitReview(path: string, assets: string[] = []): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('git_review_reject', { input: { path, assets } });
 }
 
 export async function checkPathsExist(paths: string[]): Promise<boolean[]> {

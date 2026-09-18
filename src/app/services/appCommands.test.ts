@@ -103,6 +103,24 @@ describe('appCommands', () => {
     expect(handlers.openSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('通过桌面菜单命令控制 Git 审阅模式', () => {
+    const handlers = createHandlers();
+    handlers.toggleReviewMode = vi.fn();
+    handlers.acceptReviewHunk = vi.fn();
+    handlers.acceptAllReview = vi.fn();
+    handlers.rejectReview = vi.fn();
+
+    executeDesktopCommand('review-toggle', handlers);
+    executeDesktopCommand('review-accept-current', handlers);
+    executeDesktopCommand('review-accept-all', handlers);
+    executeDesktopCommand('review-reject', handlers);
+
+    expect(handlers.toggleReviewMode).toHaveBeenCalledTimes(1);
+    expect(handlers.acceptReviewHunk).toHaveBeenCalledTimes(1);
+    expect(handlers.acceptAllReview).toHaveBeenCalledTimes(1);
+    expect(handlers.rejectReview).toHaveBeenCalledTimes(1);
+  });
+
   it('通过桌面菜单命令触发段落列表和提示块', () => {
     const handlers = createHandlers();
 

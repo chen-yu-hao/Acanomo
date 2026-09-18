@@ -25,6 +25,8 @@
   --md-editor-ui-font-size: 14px;
   --md-editor-ui-font-size-sm: 13px;
   --md-editor-ui-font-size-xs: 12px;
+  --md-review-added: #2563eb;
+  --md-review-deleted: #dc2626;
   --md-editor-line-height: 1.7;
   --md-editor-z-context-menu: 80;
   --md-editor-zoom: 1;
@@ -48,6 +50,8 @@
   --md-editor-shadow-raised: 0 1px 4px rgba(0, 0, 0, 0.18);
   --md-editor-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
   --md-editor-shadow-dialog: 0 20px 60px rgba(0, 0, 0, 0.42);
+  --md-review-added: #60a5fa;
+  --md-review-deleted: #f87171;
 }
 
 :root[data-theme-style='classic'] {

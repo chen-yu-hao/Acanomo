@@ -25,6 +25,7 @@
     SplitViewLayout,
     Tab,
   } from '../types';
+  import type { ReviewDiff, ReviewHunk } from '../../lib/review/review';
   import AppTitleBar from './AppTitleBar.svelte';
   import type { MarkdownSourceEditorHandle } from './markdownSourceEditor';
   import DocumentTabs from './DocumentTabs.svelte';
@@ -235,6 +236,16 @@
   export let appBootState: AppBootState;
   export let onSourceScroll: (() => void) | undefined = undefined;
   export let onSemanticScroll: (() => void) | undefined = undefined;
+  export let reviewDiff: ReviewDiff | null = null;
+  export let reviewBaselineCommit = '';
+  export let reviewRepoRoot = '';
+  export let reviewBusy = false;
+  export let acceptReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
+  export let acceptAllReview: () => void = () => undefined;
+  export let rejectReview: () => void = () => undefined;
+  export let refreshReview: () => void = () => undefined;
+  export let closeReview: () => void = () => undefined;
+  export let selectReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
 
   $: hasOpenDocument = appBootState === 'ready' && tabs.length > 0 && Boolean(activeTabId);
   $: activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
@@ -549,6 +560,16 @@
               {updateActiveOutlineFromSemanticScroll}
               {onSourceScroll}
               {onSemanticScroll}
+              {reviewDiff}
+              {reviewBaselineCommit}
+              {reviewRepoRoot}
+              {reviewBusy}
+              {acceptReviewHunk}
+              {acceptAllReview}
+              {rejectReview}
+              {refreshReview}
+              {closeReview}
+              {selectReviewHunk}
               {handleEditorPaste}
               {handleEditorDrop}
               {handleWorkspaceContextMenu}

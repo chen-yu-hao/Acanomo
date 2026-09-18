@@ -3052,3 +3052,10 @@
 .bibliography-block ol { padding-left: 2rem; }
 .bibliography-block ul { list-style: none; padding-left: 0; }
 .bibliography-block li { margin: 0.4rem 0; }
+.prosemirror-host .review-semantic-added {
+  color: var(--md-editor-fg);
+  text-decoration-line: underline;
+  text-decoration-color: var(--md-review-added, #2563eb);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
