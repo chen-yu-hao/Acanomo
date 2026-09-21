@@ -3044,18 +3044,88 @@
   outline: 2px solid var(--md-editor-accent);
   /* outline-offset: 1px; */
 }
-.math-block { position: relative; padding-right: 4.5rem; }
-.math-block .equation-number { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--md-editor-muted, #68707a); font-variant-numeric: tabular-nums; }
-.citation-node, .equation-ref { color: var(--md-editor-link, #116d8f); cursor: pointer; }
-.citation-node.is-unresolved, .equation-ref.is-unresolved, .bibliography-block .is-unresolved { color: #b42318; }
-.bibliography-block { margin: 1.5rem 0; }
-.bibliography-block ol { padding-left: 2rem; }
-.bibliography-block ul { list-style: none; padding-left: 0; }
-.bibliography-block li { margin: 0.4rem 0; }
+.math-block {
+  position: relative;
+  padding-right: 4.5rem;
+}
+.math-block .equation-number {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--md-editor-muted, #68707a);
+  font-variant-numeric: tabular-nums;
+}
+.citation-node,
+.equation-ref {
+  color: var(--md-editor-link, #116d8f);
+  cursor: pointer;
+}
+.citation-node.is-unresolved,
+.equation-ref.is-unresolved,
+.bibliography-block .is-unresolved {
+  color: #b42318;
+}
+.bibliography-block {
+  margin: 1.5rem 0;
+}
+.bibliography-block ol {
+  padding-left: 2rem;
+}
+.bibliography-block ul {
+  list-style: none;
+  padding-left: 0;
+}
+.bibliography-block li {
+  margin: 0.4rem 0;
+}
 .prosemirror-host .review-semantic-added {
   color: var(--md-editor-fg);
   text-decoration-line: underline;
   text-decoration-color: var(--md-review-added, #2563eb);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+  /* Markdown keeps trailing spaces significant (hard breaks and review
+     changes), while normal HTML white-space collapses them. */
+  white-space: pre-wrap;
+}
+
+.prosemirror-host .review-semantic-added * {
+  color: var(--md-editor-fg);
+}
+
+.prosemirror-host .review-semantic-added-whitespace {
+  white-space: break-spaces;
+}
+
+.prosemirror-host .review-semantic-deleted {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.15rem 0;
+  color: var(--md-editor-fg);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--md-review-deleted, #dc2626);
+  text-decoration-thickness: 2px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  user-select: text;
+}
+
+.prosemirror-host .review-semantic-deleted span {
+  color: var(--md-editor-fg);
+}
+
+.prosemirror-host .review-semantic-deleted-trailing-whitespace {
+  white-space: break-spaces;
+}
+
+.prosemirror-host .review-semantic-deleted-inline {
+  display: inline;
+  width: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  vertical-align: baseline;
 }

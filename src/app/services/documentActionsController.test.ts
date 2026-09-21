@@ -65,6 +65,7 @@ function createOptions(initialTabs: Tab[]) {
   let diskReadonly = tabs[0]?.diskReadonly ?? false;
   let dirty = tabs[0]?.dirty ?? false;
   const getMarkdown = vi.fn(() => '# New Title\n\nchanged');
+  const setEditorMarkdown = vi.fn();
 
   return {
     options: {
@@ -114,6 +115,7 @@ function createOptions(initialTabs: Tab[]) {
       getEditor: () => ({
         getMarkdown,
         flushMarkdown: getMarkdown,
+        setMarkdown: setEditorMarkdown,
         setDirty: vi.fn(),
       }),
       getTabs: () => tabs,
@@ -165,6 +167,7 @@ function createOptions(initialTabs: Tab[]) {
       statusMessage,
     }),
     getMarkdown,
+    setEditorMarkdown,
   };
 }
 
@@ -244,6 +247,30 @@ describe('documentActionsController', () => {
     expect(getState().tabs[0].fileName).toBe('old.md');
     expect(getState().nativePath).toBe('C:/docs/old.md');
     expect(getState().fileName).toBe('old.md');
+  });
+
+  it('保存后把落盘规范化文本同步回编辑器并保留编辑历史', async () => {
+    const tab = createTab({ markdown: '# New Title\n\nchanged' });
+    const { options, setEditorMarkdown } = createOptions([tab]);
+    const document: NativeDocument = {
+      path: 'C:/docs/old.md',
+      fileName: 'old.md',
+      markdown: '# New Title\n\nchanged\n\n',
+      modifiedAt: 2,
+      sizeBytes: 23,
+      readonly: false,
+    };
+    vi.mocked(saveNativeMarkdownFile).mockResolvedValue({ document, error: '' });
+
+    const controller = createDocumentActionsController(options as any);
+    await expect(controller.saveMarkdownFile(false)).resolves.toBe(true);
+
+    expect(setEditorMarkdown).toHaveBeenCalledWith('# New Title\n\nchanged\n\n', {
+      reason: 'save-file',
+      dirty: false,
+      savedMarkdown: '# New Title\n\nchanged\n\n',
+      preserveHistory: true,
+    });
   });
 
   it('标签恢复保存基线后取消尚未执行的自动保存', async () => {

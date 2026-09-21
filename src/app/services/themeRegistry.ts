@@ -745,12 +745,12 @@ const BUILTIN_THEME_DEFINITIONS: ThemeDefinition[] = [
     schemaVersion: 1,
     id: DEFAULT_COLOR_THEME_ID,
     version: '1.0.0',
-    author: 'Nomo',
+    author: 'AcaNomo',
     localizedNames: {
-      'zh-CN': 'Nomo 默认',
-      'zh-TW': 'Nomo 預設',
-      'en-US': 'Nomo Default',
-      'ja-JP': 'Nomo デフォルト',
+      'zh-CN': 'AcaNomo 默认',
+      'zh-TW': 'AcaNomo 預設',
+      'en-US': 'AcaNomo Default',
+      'ja-JP': 'AcaNomo デフォルト',
     },
     styleProfile: 'modern',
     variants: {
@@ -762,7 +762,7 @@ const BUILTIN_THEME_DEFINITIONS: ThemeDefinition[] = [
     schemaVersion: 1,
     id: AMBER_PAPER_THEME_ID,
     version: '1.0.0',
-    author: 'Nomo',
+    author: 'AcaNomo',
     localizedNames: {
       'zh-CN': '琥珀纸页',
       'zh-TW': '琥珀紙頁',
@@ -789,7 +789,7 @@ const BUILTIN_THEME_DEFINITIONS: ThemeDefinition[] = [
     schemaVersion: 1,
     id: CLASSIC_GRAY_THEME_ID,
     version: '1.1.0',
-    author: 'Nomo',
+    author: 'AcaNomo',
     localizedNames: {
       'zh-CN': '经典灰',
       'zh-TW': '經典灰',
@@ -816,7 +816,7 @@ const BUILTIN_THEME_DEFINITIONS: ThemeDefinition[] = [
     schemaVersion: 1,
     id: GITHUB_THEME_ID,
     version: '1.0.0',
-    author: 'Nomo',
+    author: 'AcaNomo',
     localizedNames: {
       'zh-CN': 'GitHub',
       'zh-TW': 'GitHub',
@@ -836,7 +836,7 @@ const BUILTIN_DOCUMENT_STYLES: DocumentStyleDefinition[] = [
     schemaVersion: 1,
     id: CLASSIC_DOCUMENT_STYLE_ID,
     version: '1.0.0',
-    author: 'Nomo',
+    author: 'AcaNomo',
     localizedNames: {
       'zh-CN': '经典',
       'zh-TW': '經典',
@@ -849,7 +849,7 @@ const BUILTIN_DOCUMENT_STYLES: DocumentStyleDefinition[] = [
     schemaVersion: 1,
     id: DEFAULT_DOCUMENT_STYLE_ID,
     version: '1.0.0',
-    author: 'Nomo',
+    author: 'AcaNomo',
     localizedNames: {
       'zh-CN': '现代',
       'zh-TW': '現代',

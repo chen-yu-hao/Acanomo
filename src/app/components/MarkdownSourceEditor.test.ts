@@ -8,6 +8,7 @@ import { cleanup, render } from '@testing-library/svelte/pure';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import MarkdownSourceEditor from './MarkdownSourceEditor.svelte';
 import type { MarkdownSourceEditorHandle } from './markdownSourceEditor';
+import { computeReviewDiff } from '../../lib/review/review';
 
 afterEach(() => {
   cleanup();
@@ -355,6 +356,111 @@ describe('MarkdownSourceEditor', () => {
 
     expect(handle?.getMarkdown()).toBe('中');
     expect(onMarkdownChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses one current-line anchor for every deleted line, including EOF deletions', () => {
+    const baseline = 'keep\nremoved one\nremoved two\n';
+    const current = 'keep\n';
+    const reviewDiff = computeReviewDiff(baseline, current);
+    const { container } = render(MarkdownSourceEditor, {
+      props: {
+        markdown: current,
+        sourceEditor: undefined as unknown as MarkdownSourceEditorHandle,
+        reviewDiff,
+      },
+    });
+
+    const widgets = [...container.querySelectorAll<HTMLElement>('.review-deleted-line')];
+    expect(widgets).toHaveLength(1);
+    expect(widgets[0].textContent).toBe('removed one\nremoved two\n');
+    expect(widgets.every((widget) => widget.getAttribute('contenteditable') === 'false')).toBe(
+      true,
+    );
+  });
+
+  it('keeps replacement decorations on the current line', () => {
+    const baseline = 'keep\nold\n';
+    const current = 'keep\nnew\n';
+    const { container } = render(MarkdownSourceEditor, {
+      props: {
+        markdown: current,
+        sourceEditor: undefined as unknown as MarkdownSourceEditorHandle,
+        reviewDiff: computeReviewDiff(baseline, current),
+      },
+    });
+    expect(container.querySelectorAll('.cm-line.review-added-line')).toHaveLength(1);
+    expect(container.querySelectorAll('.review-deleted-line')).toHaveLength(1);
+    expect(container.querySelector('.review-deleted-line')?.textContent).toBe('old\n');
+  });
+
+  it.each([
+    ['one trailing space', 'old \n', 'new \n'],
+    ['Markdown hard-break spaces', 'old  \n', 'new  \n'],
+    ['only a trailing-space change', 'same\n', 'same \n'],
+  ])('keeps source review marks for %s', (_name, baseline, current) => {
+    const { container } = render(MarkdownSourceEditor, {
+      props: {
+        markdown: current,
+        sourceEditor: undefined as unknown as MarkdownSourceEditorHandle,
+        reviewDiff: computeReviewDiff(baseline, current),
+      },
+    });
+
+    expect(container.querySelectorAll('.cm-line.review-added-line')).toHaveLength(1);
+    expect(container.querySelectorAll('.review-deleted-line')).toHaveLength(1);
+    expect(container.querySelector('.review-deleted-line')?.textContent).toBe(baseline);
+    expect(container.querySelector('.review-added-trailing-whitespace')?.textContent).toBe(
+      current.match(/[\t ]+$/m)?.[0],
+    );
+    if (baseline.match(/[\t ]+$/m)) {
+      expect(container.querySelector('.review-deleted-trailing-whitespace')).not.toBeNull();
+    }
+  });
+
+  it('refreshes the source trailing-whitespace mark when only its length changes', async () => {
+    let handle!: MarkdownSourceEditorHandle;
+    const first = 'new \n';
+    const second = 'new  \n';
+    const rendered = render(MarkdownSourceEditor, {
+      props: {
+        markdown: first,
+        sourceEditor: undefined as unknown as MarkdownSourceEditorHandle,
+        reviewDiff: computeReviewDiff('old\n', first),
+        onReady: (value) => (handle = value),
+      },
+    });
+
+    expect(rendered.container.querySelector('.review-added-trailing-whitespace')?.textContent).toBe(
+      ' ',
+    );
+    await rendered.rerender({
+      markdown: second,
+      sourceEditor: handle,
+      reviewDiff: computeReviewDiff('old\n', second),
+      onReady: (value) => (handle = value),
+    });
+    expect(rendered.container.querySelector('.review-added-trailing-whitespace')?.textContent).toBe(
+      '  ',
+    );
+  });
+
+  it('does not paint an out-of-range added line on the last source line', () => {
+    const { container } = render(MarkdownSourceEditor, {
+      props: {
+        markdown: 'first\nsecond',
+        sourceEditor: undefined as unknown as MarkdownSourceEditorHandle,
+        reviewDiff: {
+          baseline: 'first\nsecond',
+          current: 'first\nsecond',
+          hunks: [],
+          changes: [],
+          addedLines: [3],
+          deletedLines: [],
+          changed: true,
+        },
+      },
+    });
+    expect(container.querySelectorAll('.cm-line.review-added-line')).toHaveLength(0);
   });
 
   it('keeps mode-switch history but resets it when the active document changes', async () => {

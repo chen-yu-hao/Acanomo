@@ -42,7 +42,7 @@ export function getPlatformCapabilities(
 }
 
 export const HOMEBREW_SETUP_COMMAND =
-  'brew tap nomo-md/nomo https://github.com/nomo-md/nomo && brew install --cask nomo';
+  'brew tap chen-yu-hao/Acanomo https://github.com/chen-yu-hao/Acanomo && brew install --cask nomo';
 
 const MAC_MODIFIER_ORDER = ['ctrl', 'alt', 'shift', 'meta'] as const;
 const MAC_SHORTCUT_GAP = '\u202F';

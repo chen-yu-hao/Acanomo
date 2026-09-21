@@ -7,6 +7,7 @@ export type ContextMenuIcon =
   | 'redo'
   | 'cut'
   | 'copy'
+  | 'translate'
   | 'paste'
   | 'search'
   | 'select-all'

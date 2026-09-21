@@ -4,7 +4,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Nomo",
+        "title": "AcaNomo",
         "width": 1180,
         "height": 760,
         "minWidth": 920,
@@ -22,7 +22,7 @@
       "nsis": {
         "languages": ["SimpChinese", "English"],
         "displayLanguageSelector": true,
-        "startMenuFolder": "Nomo",
+        "startMenuFolder": "AcaNomo",
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "customLanguageFiles": {

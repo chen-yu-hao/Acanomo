@@ -110,7 +110,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
     'シングルクリックファイルはプレビュータブを再利用します。編集するかダブルクリックすると固定されます。',
   hideExplorerOnLaunch: '起動時にエクスプローラーのサイドバーを非表示にする',
   hideExplorerOnLaunchDescription:
-    '次回野茂が開くときは、サイドバーを折りたたんだままにしておきます。',
+    '次回AcaNomoが開くときは、サイドバーを折りたたんだままにしておきます。',
   closeToTray: 'トレイに隠す',
   closeToTrayDescription:
     '閉じるときにメイン エディタ ウィンドウをシステム トレイに隠します。アプリを終了しても影響を受けません。',
@@ -119,7 +119,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   closeWindowBehaviorAskEveryTime: '毎回選択',
   closeWindowBehaviorCloseWindow: 'ウィンドウを閉じる',
   closeWindowBehaviorCloseToTray: 'トレイに隠す',
-  closeWindowChoiceTitle: 'Nomo を閉じる',
+  closeWindowChoiceTitle: 'AcaNomo を閉じる',
   closeWindowChoiceMessage: 'メインウィンドウを閉じるときの動作を選択してください。',
   unsavedChangesBeforeClosingWindow:
     '未保存の変更があるファイルがあります: {names}。このウィンドウを閉じてもよろしいですか？',
@@ -131,7 +131,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   disabled: '無効',
   enableContextMenu: 'コンテキスト メニューを有効にする',
   disableContextMenu: 'コンテキスト メニューを無効にする',
-  legacyInstallerTitle: '以前の Nomo が見つかりました',
+  legacyInstallerTitle: '以前の AcaNomo が見つかりました',
   legacyInstallerMessage:
     'Microsoft Store 版と従来の NSIS 版の併用はサポートされません。Windows の「インストールされているアプリ」から旧版を手動でアンインストールしてください。設定やドキュメントは自動削除されません。',
   legacyInstallerOpenApps: 'インストールされているアプリを開く',
@@ -145,7 +145,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   registered: '登録済み',
   unregistered: '未登録',
   opening: 'オープニング...',
-  chooseNomo: '野茂を選ぶ',
+  chooseNomo: 'AcaNomoを選ぶ',
   bindMd: '.mdをバインド',
   unbinding: 'バインド解除中...',
   unbindMd: 'バインド解除',
@@ -159,13 +159,13 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
     'デフォルトのアプリ バインディングは現在、Windows でのみサポートされています。',
   mdAssociationCheckingDescription: '現在の Windows.md デフォルト アプリを読み取ります。',
   mdAssociationDefaultDescription:
-    'Nomo を Windows の既定アプリ候補として登録し、システム設定で確認します。',
+    'AcaNomo を Windows の既定アプリ候補として登録し、システム設定で確認します。',
   contextMenuDesktopOnly:
     'システム コンテキスト メニューを登録できるのは Windows デスクトップ アプリのみです。',
   contextMenuWindowsOnly: 'コンテキスト メニューの登録は現在 Windows でのみサポートされています。',
   contextMenuCheckingDescription: '現在の Windows コンテキスト メニューの登録状態を読み取ります。',
   contextMenuDefaultDescription:
-    '.md / .markdown ファイルとフォルダーのコンテキストメニューに Nomo を追加します。',
+    '.md / .markdown ファイルとフォルダーのコンテキストメニューに AcaNomo を追加します。',
   imageImport: '画像のインポート',
   imageHandlingStrategy: '画像処理戦略',
   imageHandlingStrategyDescription: '貼り付け、ドロップ、アップロードした画像のデフォルトの戦略。',
@@ -188,7 +188,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   picgoCoreConfigPathDescription:
     'デフォルトの PicGo-Core 構成を使用するには、空にすることができます。',
   connectionTest: '接続テスト',
-  connectionTestDescription: 'Nomo が現在の PicGo 設定を呼び出すことができるかどうかを確認します。',
+  connectionTestDescription: 'AcaNomo が現在の PicGo 設定を呼び出すことができるかどうかを確認します。',
   testing: 'テスト中...',
   testConnection: 'テスト接続',
   imageDefaultWidth: 'デフォルトの画像幅',
@@ -249,8 +249,12 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   export: 'エクスポート',
   exportHtml: 'HTML をエクスポート',
   exportPdf: 'PDF をエクスポート',
+  exportDocx: 'Word をエクスポート',
+  exportLatex: 'LaTeX をエクスポート',
   exportHtmlSuccess: 'HTML をエクスポートしました：{path}',
   exportPdfSuccess: 'PDF をエクスポートしました：{path}',
+  exportDocxSuccess: 'Word をエクスポートしました：{path}',
+  exportLatexSuccess: 'LaTeX をエクスポートしました：{path}',
   exportFailed: 'エクスポートに失敗しました',
   noOpenDocumentForExport:
     'ドキュメントが開かれていません。まずドキュメントを開くか作成してください。',
@@ -273,9 +277,9 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   reportIssueDescription: '不具合を報告したり、機能を提案したりできます。',
   externalLinkOpenFailed: 'リンクを開けませんでした。時間をおいて再試行してください。',
   updateCheck: 'アップデートチェック',
-  updateCheckDescription: 'GitHub リリースから安定した Nomo アップデートを確認してください。',
+  updateCheckDescription: 'GitHub リリースから安定した AcaNomo アップデートを確認してください。',
   softwareUpdateCheckNow: 'アップデートを確認する',
-  softwareUpdateChecking: '野茂の新バージョンをチェック中。',
+  softwareUpdateChecking: 'AcaNomoの新バージョンをチェック中。',
   softwareUpdateCheckingShort: 'チェック中...',
   softwareUpdateUpToDate: '最新バージョンを使用しています。',
   softwareUpdateAvailable: 'バージョン {version} が利用可能です。ダウンロードを準備しています。',
@@ -287,7 +291,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   softwareUpdateWaitingInstall:
     '更新をダウンロードし、MD5 で検証しました。再起動してインストールする確認を待っています。',
   softwareUpdateRestartAndInstall: '再起動してインストール',
-  softwareUpdateInstalling: 'インストーラーを起動しています。野茂は再始動する。',
+  softwareUpdateInstalling: 'インストーラーを起動しています。AcaNomoは再始動します。',
   softwareUpdateInstallingShort: 'インストール中...',
   softwareUpdateFailed: 'アップデートチェックまたはダウンロードに失敗しました。',
   softwareUpdateIntegrityFailed:
@@ -302,16 +306,16 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   softwareUpdateLatest: '最新',
   softwareUpdateReady: '準備ができて',
   softwareUpdateManual: '手動チェック',
-  softwareUpdateNoticeTitle: 'Nomo の新しいバージョンを利用できます',
+  softwareUpdateNoticeTitle: 'AcaNomo の新しいバージョンを利用できます',
   softwareUpdateNoticeSummary: '改善と不具合修正が含まれています。更新内容を確認できます。',
   softwareUpdateDismissVersion: 'このバージョンを今後通知しない',
   softwareUpdateRemindLater: '後で通知',
   softwareUpdateViewDetails: '更新内容を見る',
-  softwareUpdateReleaseTitle: 'Nomo v{version} が公開されました',
+  softwareUpdateReleaseTitle: 'AcaNomo v{version} が公開されました',
   softwareUpdateReleaseFallback: 'このリリースには改善と不具合修正が含まれています。',
   softwareUpdatePortableTitle: 'ポータブル版を使用中',
   softwareUpdatePortableHint:
-    'zip をダウンロードした後、Nomo を終了して既存のフォルダーを手動で置き換えてください。',
+    'zip をダウンロードした後、AcaNomo を終了して既存のフォルダーを手動で置き換えてください。',
   softwareUpdateReadyHint: '再起動後にインストールが完了します。',
   softwareUpdateInstallSafeTitle: 'インストール前にアプリは再起動しません',
   softwareUpdateInstallSafeHint: 'ダウンロード後、インストールするタイミングを選べます。',
@@ -322,7 +326,7 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   softwareUpdateAutoCheckDescription:
     'コールドスタートごとにバックグラウンドで一度確認します。失敗時は通知しません。',
   softwareUpdateStoreManaged:
-    '更新は Microsoft Store によって管理され、Nomo は GitHub のインストーラーをダウンロードしません。',
+    '更新は Microsoft Store によって管理され、AcaNomo は GitHub のインストーラーをダウンロードしません。',
   softwareUpdateStorePill: 'Microsoft Store',
   softwareUpdateStoreManagedHint:
     'Microsoft Store が利用可能な更新のダウンロードとインストールを管理します。',
@@ -415,6 +419,11 @@ export const JA_JP_EXTRA_TRANSLATIONS = {
   closeWindow: 'ウィンドウを閉じる',
   quit: 'やめる',
   editMenu: '編集',
+  reviewMenu: 'レビュー モード',
+  reviewToggle: 'レビュー モードを開始 / 終了',
+  reviewAcceptCurrent: '現在の変更を承認',
+  reviewAcceptAll: 'すべての変更を承認',
+  reviewReject: 'ステージから復元',
   undo: '元に戻す',
   redo: 'やり直し',
   cut: '切り取り',

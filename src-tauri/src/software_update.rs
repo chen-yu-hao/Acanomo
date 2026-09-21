@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 
 const GITHUB_LATEST_RELEASE_API: &str =
-    "https://api.github.com/repos/LIXianSenQwQ/nomo/releases/latest";
+    "https://api.github.com/repos/chen-yu-hao/Acanomo/releases/latest";
 const GITHUB_PROXY_PREFIX: &str = "https://gh-proxy.com/";
 const UPDATE_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const UPDATE_SMALL_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
@@ -756,7 +756,7 @@ fn install_software_update_inner<R: Runtime>(
 #[cfg(target_os = "windows")]
 fn is_current_windows_installer_installation() -> Result<bool, String> {
     let exe_path = std::env::current_exe()
-        .map_err(|error| format!("读取 Nomo 可执行文件路径失败：{error}"))?;
+        .map_err(|error| format!("读取 AcaNomo 可执行文件路径失败：{error}"))?;
     is_windows_installer_installation_for_path(&exe_path)
 }
 
@@ -1200,7 +1200,7 @@ fn update_request_url(
         SoftwareUpdateSource::GitHub => Ok(original_url.to_string()),
         SoftwareUpdateSource::GhProxy => github_proxy_url(original_url).ok_or_else(|| {
             SoftwareUpdateRequestFailure::terminal(
-                "该更新地址不属于允许通过 gh-proxy 访问的 Nomo GitHub 地址。",
+                "该更新地址不属于允许通过 gh-proxy 访问的 AcaNomo GitHub 地址。",
             )
         }),
     }
@@ -1219,11 +1219,11 @@ fn github_proxy_url(original_url: &str) -> Option<String> {
     }
 
     let allowed = (url.host_str() == Some("api.github.com")
-        && url.path() == "/repos/LIXianSenQwQ/nomo/releases/latest")
+        && url.path() == "/repos/chen-yu-hao/Acanomo/releases/latest")
         || (url.host_str() == Some("github.com")
             && url
                 .path()
-                .starts_with("/LIXianSenQwQ/nomo/releases/download/"));
+                .starts_with("/chen-yu-hao/Acanomo/releases/download/"));
     allowed.then(|| format!("{GITHUB_PROXY_PREFIX}{original_url}"))
 }
 
@@ -1236,7 +1236,7 @@ fn is_retryable_update_status(status: reqwest::StatusCode) -> bool {
 
 fn release_http_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
-        .user_agent("Nomo software updater")
+        .user_agent("AcaNomo software updater")
         .connect_timeout(UPDATE_CONNECT_TIMEOUT)
         .read_timeout(UPDATE_DOWNLOAD_READ_TIMEOUT)
         .build()
@@ -1263,7 +1263,7 @@ fn select_windows_installer_asset<'a>(
     assets: &'a [GitHubReleaseAsset],
     version: &str,
 ) -> Option<&'a GitHubReleaseAsset> {
-    let expected_name = format!("Nomo_{version}_x64-setup.exe");
+    let expected_name = format!("AcaNomo_{version}_x64-setup.exe");
     assets.iter().find(|asset| asset.name == expected_name)
 }
 
@@ -1271,16 +1271,16 @@ fn select_windows_portable_asset<'a>(
     assets: &'a [GitHubReleaseAsset],
     version: &str,
 ) -> Option<&'a GitHubReleaseAsset> {
-    let expected_name = format!("Nomo_{version}_x64.zip");
+    let expected_name = format!("AcaNomo_{version}_x64.zip");
     assets.iter().find(|asset| asset.name == expected_name)
 }
 
 fn expected_asset_name(kind: SoftwareUpdateAssetKind, version: &str) -> String {
     match kind {
         SoftwareUpdateAssetKind::WindowsInstaller => {
-            format!("Nomo_{version}_x64-setup.exe")
+            format!("AcaNomo_{version}_x64-setup.exe")
         }
-        SoftwareUpdateAssetKind::WindowsPortable => format!("Nomo_{version}_x64.zip"),
+        SoftwareUpdateAssetKind::WindowsPortable => format!("AcaNomo_{version}_x64.zip"),
     }
 }
 
@@ -1498,12 +1498,12 @@ mod tests {
     #[test]
     fn parses_checksums_md5_with_exact_file_name() {
         let checksums = "\
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  Nomo_0.1.4_x64.zip
-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  Nomo_0.1.4_x64-setup.exe
-cccccccccccccccccccccccccccccccc  Nomo_0.1.4_x64-setup.exe.sig";
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  AcaNomo_0.1.4_x64.zip
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  AcaNomo_0.1.4_x64-setup.exe
+cccccccccccccccccccccccccccccccc  AcaNomo_0.1.4_x64-setup.exe.sig";
 
         assert_eq!(
-            find_md5_for_file(checksums, "Nomo_0.1.4_x64-setup.exe").as_deref(),
+            find_md5_for_file(checksums, "AcaNomo_0.1.4_x64-setup.exe").as_deref(),
             Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
         );
     }
@@ -1511,22 +1511,22 @@ cccccccccccccccccccccccccccccccc  Nomo_0.1.4_x64-setup.exe.sig";
     #[test]
     fn ignores_invalid_or_missing_checksum_rows() {
         let checksums = "\
-not-md5  Nomo_0.1.4_x64-setup.exe
+not-md5  AcaNomo_0.1.4_x64-setup.exe
 dddddddddddddddddddddddddddddddd
-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  Nomo_0.1.4_x64.zip";
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  AcaNomo_0.1.4_x64.zip";
 
         assert_eq!(
-            find_md5_for_file(checksums, "Nomo_0.1.4_x64-setup.exe"),
+            find_md5_for_file(checksums, "AcaNomo_0.1.4_x64-setup.exe"),
             None
         );
     }
 
     #[test]
     fn supports_asset_names_with_spaces() {
-        let checksums = "ffffffffffffffffffffffffffffffff  Nomo Setup 0.1.4 x64.exe";
+        let checksums = "ffffffffffffffffffffffffffffffff  AcaNomo Setup 0.1.4 x64.exe";
 
         assert_eq!(
-            find_md5_for_file(checksums, "Nomo Setup 0.1.4 x64.exe").as_deref(),
+            find_md5_for_file(checksums, "AcaNomo Setup 0.1.4 x64.exe").as_deref(),
             Some("ffffffffffffffffffffffffffffffff")
         );
     }
@@ -1534,15 +1534,15 @@ eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  Nomo_0.1.4_x64.zip";
     #[test]
     fn selects_only_expected_windows_installer_asset() {
         let assets = vec![
-            asset("Nomo_0.1.4_x64.zip"),
-            asset("Nomo_0.1.4_x64-setup.exe.sig"),
-            asset("Nomo_0.1.4_aarch64.dmg"),
-            asset("Nomo_0.1.4_x64-setup.exe"),
+            asset("AcaNomo_0.1.4_x64.zip"),
+            asset("AcaNomo_0.1.4_x64-setup.exe.sig"),
+            asset("AcaNomo_0.1.4_aarch64.dmg"),
+            asset("AcaNomo_0.1.4_x64-setup.exe"),
         ];
 
         assert_eq!(
             select_windows_installer_asset(&assets, "0.1.4").map(|asset| asset.name.as_str()),
-            Some("Nomo_0.1.4_x64-setup.exe")
+            Some("AcaNomo_0.1.4_x64-setup.exe")
         );
     }
 

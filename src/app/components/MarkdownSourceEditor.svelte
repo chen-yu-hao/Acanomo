@@ -19,7 +19,7 @@
   import { onDestroy, onMount } from 'svelte';
   import type { BlockAlignmentAnchor } from '../services/markdownBlockAlignment';
   import { getSourceTextChanges, type MarkdownSourceEditorHandle } from './markdownSourceEditor';
-  import type { ReviewDiff } from '../../lib/review/review';
+  import { buildReviewSourceDecorations, type ReviewDiff } from '../../lib/review/review';
 
   export let markdown: string;
   export let documentId = '';
@@ -73,6 +73,7 @@
     line: number;
     kind: 'added' | 'deleted';
     text?: string;
+    trailingWhitespace?: string;
   }
   const setReviewDecorations = StateEffect.define<readonly ReviewDecorationSpec[]>();
   const sourceSpacerField = StateField.define<DecorationSet>({
@@ -99,12 +100,37 @@
 
   class ReviewDeletedWidget extends WidgetType {
     readonly text: string;
-    constructor(text: string) { super(); this.text = text; }
-    eq(other: ReviewDeletedWidget) { return other.text === this.text; }
+    constructor(text: string) {
+      super();
+      this.text = text;
+    }
+    eq(other: ReviewDeletedWidget) {
+      return other.text === this.text;
+    }
     toDOM() {
       const node = document.createElement('div');
       node.className = 'review-deleted-line';
-      node.textContent = this.text || ' ';
+      node.contentEditable = 'false';
+      node.setAttribute('contenteditable', 'false');
+      const segments = this.text.split(/(\r?\n)/);
+      for (const [index, segment] of segments.entries()) {
+        if (/^\r?\n$/.test(segment)) {
+          node.appendChild(document.createTextNode(segment));
+          continue;
+        }
+        if (!segment && index === segments.length - 1 && index > 0) continue;
+        const trailingWhitespace = segment.match(/[\t ]+$/)?.[0] ?? (segment ? '' : ' ');
+        const body = trailingWhitespace
+          ? segment.slice(0, segment.length - trailingWhitespace.length)
+          : segment;
+        if (body) node.appendChild(document.createTextNode(body));
+        if (trailingWhitespace) {
+          const trailing = document.createElement('span');
+          trailing.className = 'review-deleted-trailing-whitespace';
+          trailing.textContent = trailingWhitespace;
+          node.appendChild(trailing);
+        }
+      }
       node.setAttribute('aria-label', `Deleted: ${this.text}`);
       return node;
     }
@@ -118,14 +144,26 @@
         if (!effect.is(setReviewDecorations)) continue;
         const decorations = new RangeSetBuilder<Decoration>();
         for (const spec of effect.value) {
-          const lineNumber = Math.max(1, Math.min(spec.line, transaction.state.doc.lines));
-          const line = transaction.state.doc.line(lineNumber);
-          const position = spec.kind === 'deleted' && spec.line > transaction.state.doc.lines
-            ? transaction.state.doc.length
-            : line.from;
           if (spec.kind === 'added') {
-            decorations.add(position, position, Decoration.line({ class: 'review-added-line' }));
+            // An insertion line must belong to the current document. Clamping
+            // a stale/out-of-range line to the last line paints an unrelated
+            // block while the source snapshot is still catching up.
+            if (spec.line < 1 || spec.line > transaction.state.doc.lines) continue;
+            const line = transaction.state.doc.line(spec.line);
+            decorations.add(line.from, line.from, Decoration.line({ class: 'review-added-line' }));
+            if (spec.trailingWhitespace) {
+              const from = Math.max(line.from, line.to - spec.trailingWhitespace.length);
+              decorations.add(
+                from,
+                line.to,
+                Decoration.mark({ class: 'review-added-trailing-whitespace' }),
+              );
+            }
           } else {
+            const position =
+              spec.line > transaction.state.doc.lines
+                ? transaction.state.doc.length
+                : transaction.state.doc.line(Math.max(1, spec.line)).from;
             decorations.add(
               position,
               position,
@@ -152,6 +190,7 @@
   let externalDispatchDepth = 0;
   let mountedDocumentId = documentId;
   let currentGaps = new Map<string, number>();
+  let reviewDecorationSignature = '';
   const readonlyCompartment = new Compartment();
   const historyCompartment = new Compartment();
 
@@ -245,6 +284,7 @@
       });
       view.dispatch({ effects: historyCompartment.reconfigure(history()) });
       currentGaps.clear();
+      reviewDecorationSignature = '';
       mountedDocumentId = documentId;
     } finally {
       externalDispatchDepth -= 1;
@@ -262,12 +302,16 @@
   }
 
   $: if (view) {
-    const specs: ReviewDecorationSpec[] = [];
-    for (const line of reviewDiff?.addedLines ?? []) specs.push({ line, kind: 'added' });
-    for (const deleted of reviewDiff?.deletedLines ?? []) {
-      specs.push({ line: deleted.line, kind: 'deleted', text: deleted.text });
+    const specs: ReviewDecorationSpec[] = buildReviewSourceDecorations(reviewDiff);
+    const signature = specs
+      .map(
+        (spec) => `${spec.kind}:${spec.line}:${spec.text ?? ''}:${spec.trailingWhitespace ?? ''}`,
+      )
+      .join('\u0000');
+    if (signature !== reviewDecorationSignature) {
+      reviewDecorationSignature = signature;
+      view.dispatch({ effects: setReviewDecorations.of(specs) });
     }
-    view.dispatch({ effects: setReviewDecorations.of(specs) });
   }
 
   function createHandle(): MarkdownSourceEditorHandle {
@@ -362,7 +406,10 @@
         const coordinates = editorView.coordsAtPos(editorView.state.selection.main.head);
         if (!coordinates) {
           const line = editorView.state.doc.lineAt(editorView.state.selection.main.head).number;
-          return (editorView.documentPadding.top + getLineTextTop(editorView, line)) / getViewScale(editorView);
+          return (
+            (editorView.documentPadding.top + getLineTextTop(editorView, line)) /
+            getViewScale(editorView)
+          );
         }
         const rect = editorView.scrollDOM.getBoundingClientRect();
         const scale = rect.height / editorView.scrollDOM.clientHeight || 1;
@@ -477,9 +524,7 @@
         if (import.meta.env.DEV) {
           requestAnimationFrame(() => {
             const spacerMeasurements = [
-              ...editorView.dom.querySelectorAll<HTMLElement>(
-                '.source-block-alignment-spacer',
-              ),
+              ...editorView.dom.querySelectorAll<HTMLElement>('.source-block-alignment-spacer'),
             ].map((spacer) => ({
               key: spacer.dataset.alignmentKey,
               styleHeight: spacer.style.height,
@@ -527,17 +572,14 @@
   }
 
   function getLineTextTop(editorView: EditorView, lineNumber: number) {
-    const line = editorView.state.doc.line(
-      clamp(lineNumber, 1, editorView.state.doc.lines),
-    );
+    const line = editorView.state.doc.line(clamp(lineNumber, 1, editorView.state.doc.lines));
     const lineBlock = editorView.lineBlockAt(line.from);
     if (!Array.isArray(lineBlock.type)) return lineBlock.top;
 
     // 行首 block widget 会让 lineBlock.top 指向 spacer 顶部。锚点代表的是
     // Markdown 行文字起点，必须从复合逻辑行中选择 widget 之后的 Text 子块。
     const textBlock = lineBlock.type.find(
-      (block) =>
-        block.type === BlockType.Text && block.from <= line.from && block.to >= line.from,
+      (block) => block.type === BlockType.Text && block.from <= line.from && block.to >= line.from,
     );
     return textBlock?.top ?? lineBlock.top;
   }

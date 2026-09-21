@@ -91,7 +91,7 @@ export async function createAppWindow(
     const windowId = preparedWindowLabel ?? (await invoke<string>('create_new_window'));
     const appWindow = new WebviewWindow(windowId, {
       url: '/',
-      title: 'Nomo',
+      title: 'AcaNomo',
       width: 1180,
       height: 760,
       minWidth: 920,
@@ -285,7 +285,7 @@ export async function updateAppWindowTitle(
     return;
   }
 
-  const title = `${fileName}${dirty ? ' *' : ''} - Nomo`;
+  const title = `${fileName}${dirty ? ' *' : ''} - AcaNomo`;
   // macOS 上标题被 hiddenTitle + Overlay 隐藏，无需写入 NSWindow；调用 setTitle 会使
   // AppKit 重置标题栏布局，把 trafficLightPosition 摆回默认位置（红绿灯偏上），直到
   // 下次窗口重绘才恢复。托盘菜单标题走 report_window_title，不受影响。

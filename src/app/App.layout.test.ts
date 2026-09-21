@@ -30,6 +30,11 @@ describe('App outline layout', () => {
     'utf-8',
   );
   const titleBarSource = readFileSync(resolve(__dirname, 'components/AppTitleBar.svelte'), 'utf-8');
+  const i18nSource = readFileSync(resolve(__dirname, 'i18n.ts'), 'utf-8');
+  const contextMenuSource = readFileSync(
+    resolve(__dirname, 'components/ContextMenu.svelte'),
+    'utf-8',
+  );
   const windowsCaptionControlsSource = readFileSync(
     resolve(__dirname, 'components/WindowsCaptionControls.svelte'),
     'utf-8',
@@ -68,12 +73,13 @@ describe('App outline layout', () => {
     resolve(__dirname, 'services/desktopWindow.ts'),
     'utf-8',
   );
-  const themeManagerSource = readFileSync(
-    resolve(__dirname, 'services/themeManager.ts'),
-    'utf-8',
-  );
+  const themeManagerSource = readFileSync(resolve(__dirname, 'services/themeManager.ts'), 'utf-8');
   const tauriMenuSource = readFileSync(
     resolve(__dirname, '../../src-tauri/src/window/menu.rs'),
+    'utf-8',
+  );
+  const gitReviewSource = readFileSync(
+    resolve(__dirname, '../../src-tauri/src/git_review.rs'),
     'utf-8',
   );
   const tauriLibSource = readFileSync(resolve(__dirname, '../../src-tauri/src/lib.rs'), 'utf-8');
@@ -228,6 +234,9 @@ describe('App outline layout', () => {
     expect(outlineStyles).toMatch(/position:\s*fixed;/);
     expect(outlineStyles).toMatch(/width:\s*220px;/);
     expect(outlineStyles).toMatch(/right:\s*clamp\(32px,\s*3\.5cqw,\s*160px\);/);
+    expect(styles).toMatch(
+      /\.editor-review-layout\.review-active\s*>\s*\.editor-grid\s*>\s*\.content-outline\s*\{[\s\S]*?right:\s*calc\(clamp\(32px,\s*3\.5cqw,\s*160px\)\s*\+\s*302px\);/,
+    );
     expect(compactOutlineStyles).toMatch(
       /\.editor-grid:has\(> \.content-outline\) \.document-layout\s*\{[\s\S]*?grid-template-columns:\s*1fr;[\s\S]*?justify-content:\s*center;/,
     );
@@ -538,6 +547,66 @@ describe('App outline layout', () => {
     expect(tauriMenuSource).toContain('tr(locale, "menu_comment_block")');
   });
 
+  it('wires Git review actions through the Windows web edit menu', () => {
+    expect(titleBarSource).toContain('t.reviewMenu()');
+    expect(titleBarSource).toContain('t.reviewToggle()');
+    expect(titleBarSource).toContain('t.reviewAcceptCurrent()');
+    expect(titleBarSource).toContain('t.reviewAcceptAll()');
+    expect(titleBarSource).toContain('t.reviewReject()');
+    expect(titleBarSource).toContain('acceptCurrentReview');
+    expect(appShellSource).toContain('{toggleReviewMode}');
+    expect(appShellSource).toContain('{acceptCurrentReview}');
+    expect(appSource).toContain('acceptCurrentReview={() => void acceptSelectedReviewChange()}');
+    expect(tauriMenuSource).toContain('SubmenuBuilder::new(app, tr(locale, "menu_review"))');
+    expect(tauriMenuSource).toContain('"review-accept-current"');
+    expect(i18nSource).toContain("reviewMenu: '审阅模式'");
+    expect(i18nSource).toContain("reviewMenu: 'Review mode'");
+    expect(gitReviewSource).toContain('CommandExt, ExitStatusExt');
+    expect(gitReviewSource).toContain('command.creation_flags(CREATE_NO_WINDOW)');
+    expect(gitReviewSource.match(/Command::new\("git"\)/g) ?? []).toHaveLength(1);
+  });
+
+  it('collects accept-all assets from baseline and current Markdown independently', () => {
+    expect(appSource).toContain('collectReviewAssets(reviewBaseline, reviewCurrentMarkdown())');
+    expect(appSource).not.toContain(
+      'collectReviewAssets(`${reviewBaseline}\\n${reviewCurrentMarkdown()}`)',
+    );
+  });
+
+  it('wires Word and LaTeX export through web and native menus', () => {
+    expect(titleBarSource).toContain('export let exportDocx: () => void;');
+    expect(titleBarSource).toContain('export let exportLatex: () => void;');
+    expect(titleBarSource).toContain("finish(exportDocx, 'file')");
+    expect(titleBarSource).toContain("finish(exportLatex, 'file')");
+    expect(appShellSource).toContain('{exportDocx}');
+    expect(appShellSource).toContain('{exportLatex}');
+    expect(appSource).toContain("exportDocx: () => handleExport('docx')");
+    expect(appSource).toContain("exportLatex: () => handleExport('latex')");
+    expect(appSource).toContain("exportDocx={() => handleExport('docx')}");
+    expect(appSource).toContain("exportLatex={() => handleExport('latex')}");
+    expect(appCommandsSource).toContain("command === 'export-docx'");
+    expect(appCommandsSource).toContain("command === 'export-latex'");
+    expect(tauriMenuSource).toContain('"export-docx"');
+    expect(tauriMenuSource).toContain('"export-latex"');
+    expect(tauriLibSource).toContain('crate::export::export_file');
+    expect(i18nSource).toContain("exportDocx: '导出 Word'");
+    expect(i18nSource).toContain("exportLatex: '导出 LaTeX'");
+    expect(appSource).toContain('editor.refreshSemanticView();');
+  });
+
+  it('offers Google Translate for selected text and points About links to Acanomo', () => {
+    expect(appSource).toContain('label: t.translate()');
+    expect(appSource).toContain("icon: 'translate'");
+    expect(appSource).toContain('translateText(text)');
+    expect(appSource).toContain('<TranslationDialog');
+    expect(appSource).not.toContain('buildGoogleTranslateUrl');
+    expect(contextMenuSource).toContain('translate: Languages');
+    expect(settingsWindowSource).toContain('https://github.com/chen-yu-hao/Acanomo');
+    expect(settingsWindowSource).toContain(
+      'https://github.com/chen-yu-hao/Acanomo/issues/new/choose',
+    );
+  });
+
   it('forwards native menu events to desktop command handlers', () => {
     const tauriLibSource = readFileSync(resolve(__dirname, '../../src-tauri/src/lib.rs'), 'utf-8');
     const tauriCommandsSource = readFileSync(
@@ -632,7 +701,7 @@ describe('App outline layout', () => {
     expect(tauriWindowsConfig.bundle.targets).toEqual(['nsis']);
     expect(tauriWindowsConfig.bundle.windows.nsis.languages).toEqual(['SimpChinese', 'English']);
     expect(tauriWindowsConfig.bundle.windows.nsis.displayLanguageSelector).toBe(true);
-    expect(tauriWindowsConfig.bundle.windows.nsis.startMenuFolder).toBe('Nomo');
+    expect(tauriWindowsConfig.bundle.windows.nsis.startMenuFolder).toBe('AcaNomo');
     expect(tauriWindowsConfig.bundle.windows.nsis.installerIcon).toBe('icons/icon.ico');
     expect(tauriWindowsConfig.bundle.windows.nsis.uninstallerIcon).toBe('icons/icon.ico');
     expect(tauriWindowsConfig.bundle.windows.nsis.customLanguageFiles.SimpChinese).toBe(
@@ -657,7 +726,7 @@ describe('App outline layout', () => {
 
     expect(releaseWorkflowSource).toContain("args: '--bundles nsis'");
     expect(releaseWorkflowSource).toContain('tauri-apps/tauri-action@v0.6.2');
-    expect(releaseWorkflowSource).toContain('Nomo_${version}_x64.zip');
+    expect(releaseWorkflowSource).toContain('AcaNomo_${version}_x64.zip');
     expect(releaseWorkflowSource).toContain('gh release upload');
     expect(releaseWorkflowSource).toContain('checksums.md5: MD5 校验清单');
     expect(releaseWorkflowSource).toContain('name: Publish MD5 checksums');
@@ -674,7 +743,7 @@ describe('App outline layout', () => {
     expect(tauriLibSource).not.toContain('tauri_plugin_updater');
   });
 
-  it('registers Nomo as an optional document open-with application', () => {
+  it('registers AcaNomo as an optional document open-with application', () => {
     expect(windowsOpenWithInstallerHookSource).toContain('NSIS_HOOK_POSTINSTALL');
     expect(windowsOpenWithInstallerHookSource).toContain(
       'Software\\Classes\\Applications\\${MAINBINARYNAME}.exe',
@@ -884,7 +953,7 @@ describe('App outline layout', () => {
     expect(titleBarSource).not.toContain('nomoAppIcon');
     expect(titleBarSource).not.toContain('class="app-logo"');
     expect(titleBarSource).not.toContain('<img class="app-logo"');
-    expect(titleBarSource).toContain('Nomo</span>');
+    expect(titleBarSource).toContain('AcaNomo</span>');
     expect(titleBarSource).not.toContain('<span class="app-logo">M</span>');
     expect(titleBarSource).toContain('t.showExplorerSidebar()');
     expect(titleBarSource).toContain('t.hideExplorerSidebar()');
@@ -911,8 +980,8 @@ describe('App outline layout', () => {
     expect(windowsCaptionControlsSource).not.toContain('currentWindow.destroy()');
     expect(windowsCaptionControlsSource).toContain('width: 46px;');
     expect(windowsCaptionControlsSource).toContain('height: 100%;');
-    expect(desktopWindowSource).toContain("title: 'Nomo'");
-    expect(desktopWindowSource).toContain('} - Nomo');
+    expect(desktopWindowSource).toContain("title: 'AcaNomo'");
+    expect(desktopWindowSource).toContain('} - AcaNomo');
     expect(desktopWindowSource).toContain('getNewWindowChromeOptions');
     expect(desktopWindowSource).toContain("titleBarStyle: 'overlay'");
     expect(desktopWindowSource).toContain('trafficLightPosition: new LogicalPosition(16, 24)');
@@ -1156,9 +1225,9 @@ describe('App outline layout', () => {
     expect(releaseWorkflowSource).toContain('update-homebrew-cask');
     expect(releaseWorkflowSource).toContain('Casks/nomo.rb');
     expect(existsSync(resolve(__dirname, '../../Casks/nomo.rb'))).toBe(true);
-    expect(
-      readFileSync(resolve(__dirname, 'components/ContextMenu.svelte'), 'utf-8'),
-    ).toContain('formatShortcutLabel');
+    expect(readFileSync(resolve(__dirname, 'components/ContextMenu.svelte'), 'utf-8')).toContain(
+      'formatShortcutLabel',
+    );
     expect(settingsWindowSource).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
     expect(settingsWindowSource).toContain('@media (max-width: 520px)');
     expect(settingsWindowSource).toContain('styleTokens.radiusMd');
@@ -1389,8 +1458,9 @@ describe('App outline layout', () => {
     expect(appSource).toContain('if (result.saveInProgress) return;');
   });
 
-  it('never applies an automatic external-change preference to dirty content', () => {
-    expect(appSource).toContain("if (change.type !== 'modified' || change.dirtyAtDetection)");
+  it('applies the external-change preference even when local content is dirty', () => {
+    expect(appSource).toContain("if (change.type !== 'modified')");
+    expect(appSource).not.toContain("if (change.type !== 'modified' || change.dirtyAtDetection)");
   });
 
   it('binds segmented save and external-check results to their originating session', () => {

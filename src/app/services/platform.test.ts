@@ -38,7 +38,7 @@ describe('platform', () => {
   });
 
   it('keeps a tap-and-install Homebrew command for macOS updates', () => {
-    expect(HOMEBREW_SETUP_COMMAND).toContain('brew tap nomo-md/nomo');
+    expect(HOMEBREW_SETUP_COMMAND).toContain('brew tap chen-yu-hao/Acanomo');
     expect(HOMEBREW_SETUP_COMMAND).toContain('brew install --cask nomo');
   });
 });

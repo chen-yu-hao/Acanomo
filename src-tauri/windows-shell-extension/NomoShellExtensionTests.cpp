@@ -94,7 +94,7 @@ void TestLocalization() {
     Expect(ResolveNomoLocale(L"fr-FR") == NomoLocale::English, "falls back to English");
     Expect(std::wstring(GetNomoCommandTitle(
                NomoCommandKind::Folder, NomoLocale::SimplifiedChinese)) ==
-               L"在 Nomo 中打开文件夹",
+               L"在 AcaNomo 中打开文件夹",
            "returns localized folder title");
 }
 
@@ -171,9 +171,9 @@ int wmain() {
     TestComFactory();
 
     if (g_failures == 0) {
-        std::wcout << L"NomoShellExtensionTests: all checks passed\n";
+        std::wcout << L"AcaNomoShellExtensionTests: all checks passed\n";
         return 0;
     }
-    std::cerr << "NomoShellExtensionTests: " << g_failures << " failure(s)\n";
+    std::cerr << "AcaNomoShellExtensionTests: " << g_failures << " failure(s)\n";
     return 1;
 }

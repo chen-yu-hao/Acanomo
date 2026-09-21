@@ -172,8 +172,8 @@ if ($identity.applicationId -ne 'Nomo') {
 if ($identity.state -eq 'placeholder') {
     if (
         $identity.name -ne 'NomoMarkdown.Dev' -or
-        $identity.publisher -ne 'CN=Nomo Development' -or
-        $identity.publisherDisplayName -ne 'Nomo Development' -or
+        $identity.publisher -ne 'CN=AcaNomo Development' -or
+        $identity.publisherDisplayName -ne 'AcaNomo Development' -or
         -not [string]::IsNullOrWhiteSpace([string]$identity.packageFamilyName) -or
         -not [string]::IsNullOrWhiteSpace([string]$identity.storeProductId)
     ) {
@@ -396,7 +396,7 @@ if (-not $fullTrustCapability) {
 $makeAppx = Resolve-WindowsSdkTool 'makeappx.exe'
 $signTool = Resolve-WindowsSdkTool 'signtool.exe'
 $modeSuffix = if ($Mode -eq 'Dev') { 'DEV-NOT-FOR-STORE' } else { 'STORE' }
-$msixName = "Nomo_${appVersion}_x64_$modeSuffix.msix"
+$msixName = "AcaNomo_${appVersion}_x64_$modeSuffix.msix"
 $msixPath = Join-Path $outputRoot $msixName
 
 & $makeAppx pack /o /h SHA256 /d $stagingRoot /p $msixPath
@@ -446,7 +446,7 @@ if ($Mode -eq 'Dev') {
     if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -ne [string]$identity.publisher) {
         throw '开发 MSIX 已签名，但签名证书 Publisher 与清单不一致。'
     }
-    $certificateOutputPath = Join-Path $outputRoot 'NomoDevelopment.cer'
+    $certificateOutputPath = Join-Path $outputRoot 'AcaNomoDevelopment.cer'
     Copy-Item -LiteralPath $certificateInfo.CerPath -Destination $certificateOutputPath
     $signed = $true
 }
@@ -469,14 +469,14 @@ if ($Mode -eq 'Store') {
     if (-not (Get-ChildItem -LiteralPath $symbolsStaging -File -ErrorAction SilentlyContinue)) {
         throw 'Store 构建缺少 PDB，无法生成 .appxsym。'
     }
-    $appxSymPath = Join-Path $outputRoot "Nomo_${appVersion}_x64.appxsym"
+    $appxSymPath = Join-Path $outputRoot "AcaNomo_${appVersion}_x64.appxsym"
     Compress-ToExtension $symbolsStaging $appxSymPath
 
     $uploadStaging = Join-Path $artifactsRoot 'upload'
     Reset-TaskDirectory $uploadStaging
     Copy-Item -LiteralPath $msixPath -Destination (Join-Path $uploadStaging (Split-Path $msixPath -Leaf))
     Copy-Item -LiteralPath $appxSymPath -Destination (Join-Path $uploadStaging (Split-Path $appxSymPath -Leaf))
-    $uploadPath = Join-Path $outputRoot "Nomo_${appVersion}_x64.msixupload"
+    $uploadPath = Join-Path $outputRoot "AcaNomo_${appVersion}_x64.msixupload"
     Compress-ToExtension $uploadStaging $uploadPath
 }
 

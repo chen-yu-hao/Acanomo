@@ -29,7 +29,7 @@ export interface QuickLookPreviewOptions {
 export interface QuickLookPreviewPayload extends QuickLookPreviewOptions {
   /** 待渲染的完整 Markdown UTF-8 文本；允许空字符串。 */
   markdown: string;
-  /** Nomo 原生配置中的外观偏好；配置不可读时缺失并回退到系统明暗模式。 */
+  /** AcaNomo 原生配置中的外观偏好；配置不可读时缺失并回退到系统明暗模式。 */
   appearance?: Partial<AppearancePreferences>;
 }
 
@@ -113,7 +113,7 @@ type QuickLookBlockState = {
 /**
  * 将主应用保存的外观偏好应用到 Quick Look 文档根节点。
  *
- * 颜色和样式 token 仍由 Nomo 的主题注册表解析，本函数不维护第二套 Quick Look 主题。
+ * 颜色和样式 token 仍由 AcaNomo 的主题注册表解析，本函数不维护第二套 Quick Look 主题。
  * 当偏好缺失时按系统明暗模式解析默认主题，确保正文和 Mermaid 使用同一有效主题。
  *
  * @param appearance 主应用配置中的主题模式、颜色主题和文档样式；允许缺失。
@@ -216,7 +216,7 @@ export function renderMarkdownPreview(markdown: string, options: QuickLookPrevie
   return `
     <article class="quicklook-document">
       <header class="quicklook-header">
-        <div class="quicklook-kicker">Nomo Quick Look</div>
+        <div class="quicklook-kicker">AcaNomo Quick Look</div>
         <h1>${title}</h1>
       </header>
       <div class="quicklook-markdown rich-markdown">
@@ -263,7 +263,7 @@ function createQuickLookMarkdownIt() {
     typographer: true,
   }).enable(['table', 'strikethrough']);
 
-  // 先让 markdown-it 识别链接/图片语法，再在 renderer 和 sanitizer 中按 Nomo 的安全边界过滤。
+  // 先让 markdown-it 识别链接/图片语法，再在 renderer 和 sanitizer 中按 AcaNomo 的安全边界过滤。
   md.validateLink = (url: string) => Boolean(url.trim());
 
   md.core.ruler.after('block', 'nomo_callout', (state) => {

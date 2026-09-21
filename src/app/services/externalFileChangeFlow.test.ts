@@ -26,9 +26,13 @@ describe('external file change flow', () => {
     expect(autosaveSource).toContain('t.externalChangeAutoSavePaused()');
   });
 
-  it('supports a persisted default action before opening the external change dialog', () => {
+  it('applies a persisted default action silently, including when local content is dirty', () => {
     expect(appSource).toContain('externalFileChangeBehavior');
     expect(appSource).toContain('tryHandleExternalFileChangeByPreference');
+    expect(appSource).toContain("if (change.type !== 'modified')");
+    expect(appSource).not.toContain(
+      "if (change.type !== 'modified' || change.dirtyAtDetection)",
+    );
     expect(appSource).toContain("case 'reload-external'");
     expect(appSource).toContain("case 'ignore'");
     expect(appSource).toContain("case 'overwrite-external'");

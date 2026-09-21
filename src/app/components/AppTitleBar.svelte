@@ -21,6 +21,7 @@
     type ContextMenuRequest,
   } from '../../lib/editor-core';
   import type { EditorViewMode } from '../types';
+  import type { ReviewDiff } from '../../lib/review/review';
   import { clickOutside } from '../actions/clickOutside';
   import { getPlatformCapabilities } from '../services/platform';
   import { getDiagramTypeLabel, t } from '../i18n';
@@ -69,6 +70,13 @@
   export let editAcademicSettings: () => void;
   export let insertAcademicBibliography: () => void;
   export let refreshAcademicData: () => void;
+  export let reviewMode = false;
+  export let reviewDiff: ReviewDiff | null = null;
+  export let reviewBusy = false;
+  export let toggleReviewMode: () => void = () => undefined;
+  export let acceptCurrentReview: () => void = () => undefined;
+  export let acceptAllReview: () => void = () => undefined;
+  export let rejectReview: () => void = () => undefined;
   export let editFrontMatter: () => void;
   export let showUnavailableFeature: (featureName: string) => void;
   export let setMode: (mode: EditorViewMode) => void;
@@ -81,6 +89,8 @@
   export let openSettings: () => void;
   export let exportHtml: () => void;
   export let exportPdf: () => void;
+  export let exportDocx: () => void;
+  export let exportLatex: () => void;
   export let softwareUpdateState: SoftwareUpdateSnapshot;
   export let openSoftwareUpdate: () => void;
   export let openContextMenu: (request: ContextMenuRequest) => void = () => undefined;
@@ -184,11 +194,7 @@
       const appWindow = getCurrentWindow();
       const fullscreen = await appWindow.isFullscreen();
 
-      if (
-        canSyncWindowState &&
-        platformCapabilities.isMac &&
-        requestId === windowStateRequestId
-      ) {
+      if (canSyncWindowState && platformCapabilities.isMac && requestId === windowStateRequestId) {
         isFullscreen = fullscreen;
       }
     } catch {
@@ -482,7 +488,7 @@
 
       {#if shouldShowWindowMenu}
         <div class="titlebar-left" data-drag-region>
-          <span class="app-name" data-drag-region>Nomo</span>
+          <span class="app-name" data-drag-region>AcaNomo</span>
         </div>
 
         <nav class="titlebar-menu">
@@ -573,6 +579,8 @@
                 <div class="divider"></div>
                 <button on:click={() => finish(exportHtml, 'file')}>{t.exportHtml()}</button>
                 <button on:click={() => finish(exportPdf, 'file')}>{t.exportPdf()}</button>
+                <button on:click={() => finish(exportDocx, 'file')}>{t.exportDocx()}</button>
+                <button on:click={() => finish(exportLatex, 'file')}>{t.exportLatex()}</button>
                 <div class="divider"></div>
                 <button on:click={() => finish(closeCurrentFile, 'file')}
                   >{t.closeCurrentFile()} <span class="shortcut">Ctrl + W</span></button
@@ -604,16 +612,54 @@
                 >
                 <div class="divider"></div>
                 <div class="nested-trigger">
+                  <span>{t.reviewMenu()}</span>
+                  <span aria-hidden="true">›</span>
+                  <div class="dropdown-menu nested" use:keepDropdownInViewport>
+                    <button on:click={() => finish(toggleReviewMode, 'edit')}>
+                      {t.reviewToggle()}
+                      <span class="shortcut">Ctrl + Shift + Y</span>
+                    </button>
+                    <button
+                      disabled={!reviewMode || !reviewDiff?.changed || reviewBusy}
+                      on:click={() => finish(acceptCurrentReview, 'edit')}
+                      >{t.reviewAcceptCurrent()}</button
+                    >
+                    <button
+                      disabled={!reviewMode || !reviewDiff?.changed || reviewBusy}
+                      on:click={() => finish(acceptAllReview, 'edit')}>{t.reviewAcceptAll()}</button
+                    >
+                    <button
+                      disabled={!reviewMode || reviewBusy}
+                      on:click={() => finish(rejectReview, 'edit')}>{t.reviewReject()}</button
+                    >
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="nested-trigger">
                   <span>{t.academicMenu()}</span>
                   <span aria-hidden="true">›</span>
                   <div class="dropdown-menu nested" use:keepDropdownInViewport>
-                    <button on:click={() => finish(insertAcademicCitation, 'edit')}>{t.academicInsertCitation()} <span class="shortcut">Ctrl+Shift+C</span></button>
-                    <button on:click={() => finish(insertAcademicEquationReference, 'edit')}>{t.academicInsertEquationRef()} <span class="shortcut">Ctrl+Shift+R</span></button>
-                    <button on:click={() => finish(addAcademicEquationLabel, 'edit')}>{t.academicAddLabel()}</button>
-                    <button on:click={() => finish(editAcademicSettings, 'edit')}>{t.academicSettings()}</button>
-                    <button on:click={() => finish(insertAcademicBibliography, 'edit')}>{t.academicBibliography()}</button>
+                    <button on:click={() => finish(insertAcademicCitation, 'edit')}
+                      >{t.academicInsertCitation()}
+                      <span class="shortcut">Ctrl+Shift+C</span></button
+                    >
+                    <button on:click={() => finish(insertAcademicEquationReference, 'edit')}
+                      >{t.academicInsertEquationRef()}
+                      <span class="shortcut">Ctrl+Shift+R</span></button
+                    >
+                    <button on:click={() => finish(addAcademicEquationLabel, 'edit')}
+                      >{t.academicAddLabel()}</button
+                    >
+                    <button on:click={() => finish(editAcademicSettings, 'edit')}
+                      >{t.academicSettings()}</button
+                    >
+                    <button on:click={() => finish(insertAcademicBibliography, 'edit')}
+                      >{t.academicBibliography()}</button
+                    >
                     <div class="divider"></div>
-                    <button on:click={() => finish(refreshAcademicData, 'edit')}>{t.academicRefresh()}</button>
+                    <button on:click={() => finish(refreshAcademicData, 'edit')}
+                      >{t.academicRefresh()}</button
+                    >
                   </div>
                 </div>
               </div>
@@ -958,9 +1004,7 @@
           {/if}
         </button>
       </div>
-      {#if
-        desktopEnabled && platformCapabilities.usesCustomWindowsTitlebar && !markdownMiniActive
-      }
+      {#if desktopEnabled && platformCapabilities.usesCustomWindowsTitlebar && !markdownMiniActive}
         <WindowsCaptionControls onClose={closeCurrentWindow} />
       {/if}
     </div>

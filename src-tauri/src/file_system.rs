@@ -204,7 +204,7 @@ fn document_payload(
     })
 }
 
-fn decode_markdown(bytes: &[u8]) -> Result<(String, MarkdownEncoding), String> {
+pub(crate) fn decode_markdown(bytes: &[u8]) -> Result<(String, MarkdownEncoding), String> {
     if let Some(body) = bytes.strip_prefix(UTF8_BOM) {
         return std::str::from_utf8(body)
             .map(|value| (value.to_string(), MarkdownEncoding::Utf8Bom))
@@ -723,7 +723,7 @@ mod tests {
     fn reads_sample_document_from_resource_path() {
         let root = unique_test_dir("read-sample");
         let resource_path = root.join("resource.md");
-        let sample_markdown = "# Nomo Markdown 全元素实例\n\n示例内容";
+        let sample_markdown = "# AcaNomo Markdown 全元素实例\n\n示例内容";
         fs::create_dir_all(&root).expect("create root");
         fs::write(&resource_path, sample_markdown).expect("write resource");
 

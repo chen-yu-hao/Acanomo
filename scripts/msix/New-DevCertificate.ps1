@@ -13,9 +13,9 @@ if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path $repoRoot '.artifacts\msix\dev-certificate'
 }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-$pfxPath = Join-Path $OutputDirectory 'NomoDevelopment.pfx'
-$cerPath = Join-Path $OutputDirectory 'NomoDevelopment.cer'
-$passwordPath = Join-Path $OutputDirectory 'NomoDevelopment.password.txt'
+$pfxPath = Join-Path $OutputDirectory 'AcaNomoDevelopment.pfx'
+$cerPath = Join-Path $OutputDirectory 'AcaNomoDevelopment.cer'
+$passwordPath = Join-Path $OutputDirectory 'AcaNomoDevelopment.password.txt'
 
 if (-not $Force -and (Test-Path $pfxPath) -and (Test-Path $cerPath) -and (Test-Path $passwordPath)) {
     $existingCertificate = $null

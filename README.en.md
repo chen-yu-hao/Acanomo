@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="./assets/128x128.png" alt="Nomo icon" width="60">
+  <img src="./assets/128x128.png" alt="AcaNomo icon" width="60">
 </p>
 
-<h1 align="center"><strong>Nomo</strong></h1>
+<h1 align="center"><strong>AcaNomo</strong></h1>
 
 <p align="center">
-  <a href="https://github.com/LIXianSenQwQ/nomo/releases">
-    <img src="https://img.shields.io/github/v/release/LIXianSenQwQ/nomo?label=release" alt="GitHub Release">
+  <a href="https://github.com/chen-yu-hao/Acanomo/releases">
+    <img src="https://img.shields.io/github/v/release/chen-yu-hao/Acanomo?label=release" alt="GitHub Release">
   </a>
   <a href="./LICENSE">
     <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
@@ -24,27 +24,27 @@
 
 ---
 
-Nomo is a local-first, Markdown-first desktop editor for macOS and Windows. Markdown text remains the source of truth while semantic editing and source mode stay in sync. Nomo also provides segmented editing for large TXT and JSON files, file management, document navigation, and desktop integration.
+AcaNomo is a local-first, Markdown-first desktop editor for macOS and Windows. Markdown text remains the source of truth while semantic editing and source mode stay in sync. AcaNomo also provides segmented editing for large TXT and JSON files, file management, document navigation, and desktop integration.
 
-This README tracks the current `master` branch. For the exact capabilities and changes included in an installer, see its matching [GitHub Release](https://github.com/LIXianSenQwQ/nomo/releases).
+This README tracks the current `master` branch. For the exact capabilities and changes included in an installer, see its matching [GitHub Release](https://github.com/chen-yu-hao/Acanomo/releases).
 
 <p align="center">
-  <img src="./assets/demo_image.gif" alt="Nomo demo" width="1920">
+  <img src="./assets/demo_image.gif" alt="AcaNomo demo" width="1920">
 </p>
 
 ## Download and Installation
 
-Download the appropriate package from [GitHub Releases](https://github.com/LIXianSenQwQ/nomo/releases):
+Download the appropriate package from [GitHub Releases](https://github.com/chen-yu-hao/Acanomo/releases):
 
 | System | Minimum Version | Recommended Download |
 | :--- | :--- | :--- |
 | macOS (Apple Silicon / arm64) | 12.0+ | `.dmg`, or install with Homebrew |
-| Windows | 10/11 | `Nomo_<version>_x64-setup.exe` installer / `Nomo_<version>_x64.zip` portable package |
+| Windows | 10/11 | `AcaNomo_<version>_x64-setup.exe` installer / `AcaNomo_<version>_x64.zip` portable package |
 
 macOS can also be installed with Homebrew:
 
 ```bash
-brew tap nomo-md/nomo https://github.com/nomo-md/nomo
+brew tap chen-yu-hao/Acanomo https://github.com/chen-yu-hao/Acanomo
 brew install --cask nomo
 ```
 
@@ -54,7 +54,7 @@ Stable releases also provide `checksums.md5` for download integrity checks.
 
 Current GitHub Release builds do not use a Windows publisher code signature or Apple notarization, so SmartScreen or Gatekeeper may prompt on first launch. Download only from this project's Releases and verify files against the checksum list when needed.
 
-The Windows NSIS installer and macOS app declare support for opening `.md`, `.markdown`, `.txt`, and `.json` files; the portable Windows package does not register these file types automatically. Registration only adds Nomo as an “Open with” candidate and never forcibly replaces your defaults. On Windows, Nomo settings can also manage the default Markdown opener and the classic context menu.
+The Windows NSIS installer and macOS app declare support for opening `.md`, `.markdown`, `.txt`, and `.json` files; the portable Windows package does not register these file types automatically. Registration only adds AcaNomo as an “Open with” candidate and never forcibly replaces your defaults. On Windows, AcaNomo settings can also manage the default Markdown opener and the classic context menu.
 
 ## Main Features
 
@@ -95,7 +95,7 @@ The Windows NSIS installer and macOS app declare support for opening `.md`, `.ma
 
 ### Appearance, Windows, and Platform Integration
 
-- **Themes and typography**: Follow the system or choose light / dark mode. Built-in color themes are Nomo Default, Amber Paper, Classic Gray, and GitHub, with Classic / Modern blockquote and Callout styles. Font size, line height, content width, interface zoom, and <kbd>Ctrl</kbd> + wheel zoom are configurable.
+- **Themes and typography**: Follow the system or choose light / dark mode. Built-in color themes are AcaNomo Default, Amber Paper, Classic Gray, and GitHub, with Classic / Modern blockquote and Callout styles. Font size, line height, content width, interface zoom, and <kbd>Ctrl</kbd> + wheel zoom are configurable.
 - **Interface languages**: Follow the system or choose Simplified Chinese, Traditional Chinese, English, or Japanese.
 - **Focused windows**: The explorer, toolbar, outline, and statistics toggle independently. Markdown can enter a mini window that shares the current editing state and can be pinned on top. Closing the main window can close it, ask each time, or hide it to the system tray.
 - **Export and preview**: Export Markdown as a single HTML file with best-effort image embedding, or as PDF on Windows and macOS. PDF export attempts to add heading bookmarks. macOS Quick Look previews themes, code, math, and Mermaid.
@@ -122,7 +122,7 @@ The Windows NSIS installer and macOS app declare support for opening `.md`, `.ma
 - Local links do not support UNC paths, `file://` URLs, query strings, or attachment types outside the allowlist. Relative links require the current Markdown document to be saved.
 - Local image-copy strategies require the document to be saved. PicGo upload depends on a user-managed PicGo service or command. Cleanup of unreferenced local images is off by default; when enabled, it deletes matching files inside the document directory.
 - PDF export is available on Windows and macOS and currently uses fixed A4 portrait pages with 20 mm margins. Quick Look is macOS-only and currently reads UTF-8 Markdown.
-- Windows NSIS builds can check, download, and install updates in-app. Portable Windows builds can check for updates and open the ZIP download in the system browser; exit Nomo and replace the files manually. On macOS, upgrade with Homebrew or download the DMG from the Release page.
+- Windows NSIS builds can check, download, and install updates in-app. Portable Windows builds can check for updates and open the ZIP download in the system browser; exit AcaNomo and replace the files manually. On macOS, upgrade with Homebrew or download the DMG from the Release page.
 
 ## Default Shortcuts
 
@@ -189,7 +189,7 @@ The table uses Windows defaults. Native macOS menus use `CmdOrCtrl` semantics, w
 
 ## Technology and Development
 
-Nomo is built with **Tauri 2 + Svelte 5**:
+AcaNomo is built with **Tauri 2 + Svelte 5**:
 
 | Layer | Main Technologies |
 | :--- | :--- |
@@ -266,16 +266,16 @@ Issues and pull requests are welcome:
   <a href="https://github.com/LIXianSenQwQ">
     <img src="https://img.shields.io/github/followers/LIXianSenQwQ?style=social" alt="Follow LIXianSenQwQ">
   </a>
-  <a href="https://github.com/LIXianSenQwQ/nomo">
-    <img src="https://img.shields.io/github/stars/LIXianSenQwQ/nomo?style=social" alt="Star Nomo">
+  <a href="https://github.com/chen-yu-hao/Acanomo">
+    <img src="https://img.shields.io/github/stars/chen-yu-hao/Acanomo?style=social" alt="Star AcaNomo">
   </a>
 </p>
 
-If Nomo helps you, follow [LIXianSenQwQ](https://github.com/LIXianSenQwQ) and star [Nomo](https://github.com/LIXianSenQwQ/nomo).
+If AcaNomo helps you, follow [chen-yu-hao](https://github.com/chen-yu-hao) and star [AcaNomo](https://github.com/chen-yu-hao/Acanomo).
 
 ## License
 
-Nomo is free and open-source software licensed under the [GNU Affero General Public License v3.0 or later](./LICENSE). You may use, modify, and redistribute Nomo. If you distribute Nomo, including a modified version, or make a modified version available to users over a network, you must comply with the AGPL and provide the corresponding source code. The AGPL permits commercial use and paid redistribution, but downstream recipients must retain their AGPL rights.
+AcaNomo is free and open-source software licensed under the [GNU Affero General Public License v3.0 or later](./LICENSE). You may use, modify, and redistribute AcaNomo. If you distribute AcaNomo, including a modified version, or make a modified version available to users over a network, you must comply with the AGPL and provide the corresponding source code. The AGPL permits commercial use and paid redistribution, but downstream recipients must retain their AGPL rights.
 
 Contact the maintainers to discuss a separate commercial license for proprietary integration, proprietary distribution, or use without the AGPL's open-source obligations. Third-party components remain subject to their respective licenses.
 
@@ -285,4 +285,4 @@ Contact the maintainers to discuss a separate commercial license for proprietary
 
 ## Acknowledgements
 
-Thanks to Tauri, Svelte, ProseMirror, CodeMirror, markdown-it, Shiki, KaTeX, Mermaid, markdownlint, GSAP, Lucide, Inlang, and the many other open-source projects that make Nomo possible.
+Thanks to Tauri, Svelte, ProseMirror, CodeMirror, markdown-it, Shiki, KaTeX, Mermaid, markdownlint, GSAP, Lucide, Inlang, and the many other open-source projects that make AcaNomo possible.

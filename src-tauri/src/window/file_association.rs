@@ -5,7 +5,10 @@ use tauri::{AppHandle, Runtime};
 const NOMO_MARKDOWN_PROG_ID: &str = "Nomo.Markdown";
 
 #[cfg(target_os = "windows")]
-const APP_NAME: &str = "Nomo";
+const APP_NAME: &str = "AcaNomo";
+
+#[cfg(target_os = "windows")]
+const LEGACY_APP_NAME: &str = "Nomo";
 
 #[cfg(target_os = "windows")]
 const APP_CAPABILITIES_KEY: &str = "HKCU\\Software\\Nomo\\Capabilities";
@@ -26,7 +29,7 @@ pub(crate) fn get_markdown_file_association_status<R: Runtime>(
     let start = std::time::Instant::now();
     let locale = crate::i18n::effective_locale(app);
     let exe_path = std::env::current_exe()
-        .map_err(|error| format!("读取 Nomo 可执行文件路径失败：{error}"))?;
+        .map_err(|error| format!("读取 AcaNomo 可执行文件路径失败：{error}"))?;
     let exe_file_name = exe_path
         .file_name()
         .and_then(|name| name.to_str())
@@ -89,7 +92,7 @@ pub(crate) fn register_markdown_file_association<R: Runtime>(
     }
 
     let exe_path = std::env::current_exe()
-        .map_err(|error| format!("读取 Nomo 可执行文件路径失败：{error}"))?;
+        .map_err(|error| format!("读取 AcaNomo 可执行文件路径失败：{error}"))?;
     let exe = exe_path.to_string_lossy().to_string();
     let exe_file_name = exe_path
         .file_name()
@@ -141,7 +144,7 @@ pub(crate) fn get_windows_context_menu_status<R: Runtime>(
     }
 
     let exe_path = std::env::current_exe()
-        .map_err(|error| format!("读取 Nomo 可执行文件路径失败：{error}"))?;
+        .map_err(|error| format!("读取 AcaNomo 可执行文件路径失败：{error}"))?;
     let exe = exe_path.to_string_lossy().to_string();
     let registered = is_windows_context_menu_registered(&exe)?;
     let message = if registered {
@@ -178,7 +181,7 @@ pub(crate) fn register_windows_context_menu<R: Runtime>(
     }
 
     let exe_path = std::env::current_exe()
-        .map_err(|error| format!("读取 Nomo 可执行文件路径失败：{error}"))?;
+        .map_err(|error| format!("读取 AcaNomo 可执行文件路径失败：{error}"))?;
     let exe = exe_path.to_string_lossy().to_string();
     let open_command = format!("\"{exe}\" \"%1\"");
     let background_open_command = format!("\"{exe}\" \"%V\"");
@@ -252,7 +255,7 @@ pub(crate) fn unregister_markdown_file_association<R: Runtime>(
     let _ = run_reg_delete("HKCU\\Software\\Classes\\Nomo.Markdown", &["/f"]);
     // 步骤2：删除 Applications 下的 nomo.exe 条目
     let exe_path = std::env::current_exe()
-        .map_err(|error| format!("读取 Nomo 可执行文件路径失败：{error}"))?;
+        .map_err(|error| format!("读取 AcaNomo 可执行文件路径失败：{error}"))?;
     let exe_file_name = exe_path
         .file_name()
         .and_then(|name| name.to_str())
@@ -290,6 +293,10 @@ pub(crate) fn unregister_markdown_file_association<R: Runtime>(
     );
     let _ = run_reg_delete("HKCU\\Software\\Nomo\\Capabilities", &["/f"]);
     let _ = run_reg_delete(REGISTERED_APPLICATIONS_KEY, &["/v", APP_NAME, "/f"]);
+    let _ = run_reg_delete(
+        REGISTERED_APPLICATIONS_KEY,
+        &["/v", LEGACY_APP_NAME, "/f"],
+    );
 
     Ok(DesktopActionPayload {
         ok: true,

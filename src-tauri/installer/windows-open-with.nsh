@@ -36,7 +36,7 @@
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
-  ; 卸载时只移除 Nomo 自己注册的打开方式入口，保留用户选择的其他默认程序。
+  ; 卸载时只移除 AcaNomo 自己注册的打开方式入口，保留用户选择的其他默认程序。
   DeleteRegKey SHCTX "Software\Classes\Applications\${MAINBINARYNAME}.exe"
   DeleteRegKey SHCTX "Software\Classes\Nomo.Markdown"
   DeleteRegKey SHCTX "Software\Classes\Nomo.Text"

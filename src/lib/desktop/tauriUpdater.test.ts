@@ -19,9 +19,9 @@ function createMockCandidate(
     version: '0.1.4',
     date: '2026-06-09T00:00:00Z',
     body: 'Bug fixes',
-    assetName: 'Nomo_0.1.4_x64-setup.exe',
+    assetName: 'AcaNomo_0.1.4_x64-setup.exe',
     assetSize: 100,
-    downloadUrl: 'https://example.test/Nomo_0.1.4_x64-setup.exe',
+    downloadUrl: 'https://example.test/AcaNomo_0.1.4_x64-setup.exe',
     md5: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     ...options,
   };
@@ -32,8 +32,8 @@ function createDownloadedUpdate(
 ): DownloadedSoftwareUpdate {
   return {
     version: '0.1.4',
-    assetName: 'Nomo_0.1.4_x64-setup.exe',
-    filePath: 'C:\\Users\\Qing Yu\\AppData\\Local\\Nomo\\updates\\Nomo_0.1.4_x64-setup.exe',
+    assetName: 'AcaNomo_0.1.4_x64-setup.exe',
+    filePath: 'C:\\Users\\Qing Yu\\AppData\\Local\\AcaNomo\\updates\\AcaNomo_0.1.4_x64-setup.exe',
     md5: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     downloadedBytes: 100,
     ...options,

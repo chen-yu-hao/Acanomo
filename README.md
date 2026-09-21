@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="./assets/128x128.png" alt="Nomo 图标" width="60">
+  <img src="./assets/128x128.png" alt="AcaNomo 图标" width="60">
 </p>
 
-<h1 align="center"><strong>Nomo</strong></h1>
+<h1 align="center"><strong>AcaNomo</strong></h1>
 
 <p align="center">
-  <a href="https://github.com/LIXianSenQwQ/nomo/releases">
-    <img src="https://img.shields.io/github/v/release/LIXianSenQwQ/nomo?label=release" alt="GitHub Release">
+  <a href="https://github.com/chen-yu-hao/Acanomo/releases">
+    <img src="https://img.shields.io/github/v/release/chen-yu-hao/Acanomo?label=release" alt="GitHub Release">
   </a>
   <a href="./LICENSE">
     <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
@@ -24,27 +24,27 @@
 
 ---
 
-Nomo 是一款本地优先、Markdown-first 的桌面编辑器，支持 macOS 与 Windows。它以 Markdown 文本作为文档主数据，在语义编辑与源码模式之间保持一致，同时提供 TXT、JSON 大文件分段编辑、文件管理、文档导航和桌面集成能力。
+AcaNomo 是一款本地优先、Markdown-first 的桌面编辑器，支持 macOS 与 Windows。它以 Markdown 文本作为文档主数据，在语义编辑与源码模式之间保持一致，同时提供 TXT、JSON 大文件分段编辑、文件管理、文档导航和桌面集成能力。
 
-本文描述当前 `master` 的功能；已发布安装包的具体能力与变更，请以对应的 [GitHub Release](https://github.com/LIXianSenQwQ/nomo/releases) 说明为准。
+本文描述当前 `master` 的功能；已发布安装包的具体能力与变更，请以对应的 [GitHub Release](https://github.com/chen-yu-hao/Acanomo/releases) 说明为准。
 
 <p align="center">
-  <img src="./assets/demo_image.gif" alt="Nomo 演示" width="1920">
+  <img src="./assets/demo_image.gif" alt="AcaNomo 演示" width="1920">
 </p>
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/LIXianSenQwQ/nomo/releases) 下载对应系统的安装包：
+从 [GitHub Releases](https://github.com/chen-yu-hao/Acanomo/releases) 下载对应系统的安装包：
 
 | 系统 | 最低版本 | 推荐下载 |
 | :--- | :--- | :--- |
 | macOS（Apple Silicon / arm64） | 12.0+ | `.dmg`，或通过 Homebrew 安装 |
-| Windows | 10/11 | `Nomo_<version>_x64-setup.exe` 安装版 / `Nomo_<version>_x64.zip` 免安装版 |
+| Windows | 10/11 | `AcaNomo_<version>_x64-setup.exe` 安装版 / `AcaNomo_<version>_x64.zip` 免安装版 |
 
 macOS 也可用 Homebrew：
 
 ```bash
-brew tap nomo-md/nomo https://github.com/nomo-md/nomo
+brew tap chen-yu-hao/Acanomo https://github.com/chen-yu-hao/Acanomo
 brew install --cask nomo
 ```
 
@@ -54,7 +54,7 @@ brew install --cask nomo
 
 当前 GitHub Release 构建未配置 Windows 发行者代码签名或 Apple 公证，首次打开时可能出现 SmartScreen / Gatekeeper 提示。请只从本项目 Release 下载，并在需要时使用校验清单核对文件。
 
-Windows NSIS 安装版与 macOS App 会向系统声明 `.md`、`.markdown`、`.txt` 和 `.json` 的打开能力；Windows 免安装版不会自动注册这些类型。系统声明只会把 Nomo 加入“打开方式”候选，不会强制替换默认应用。Windows 用户还可以在 Nomo 设置中管理 Markdown 默认打开方式与经典右键菜单。
+Windows NSIS 安装版与 macOS App 会向系统声明 `.md`、`.markdown`、`.txt` 和 `.json` 的打开能力；Windows 免安装版不会自动注册这些类型。系统声明只会把 AcaNomo 加入“打开方式”候选，不会强制替换默认应用。Windows 用户还可以在 AcaNomo 设置中管理 Markdown 默认打开方式与经典右键菜单。
 
 ## 主要功能
 
@@ -96,7 +96,7 @@ Windows NSIS 安装版与 macOS App 会向系统声明 `.md`、`.markdown`、`.t
 
 ### 外观、窗口与平台集成
 
-- **主题与排版**：支持跟随系统 / 浅色 / 深色，内置 Nomo 默认、琥珀纸页、经典灰、GitHub 四套配色，以及引用块与 Callout 的经典 / 现代样式；可调字号、行高、正文宽度、界面缩放和 <kbd>Ctrl</kbd> + 滚轮缩放。
+- **主题与排版**：支持跟随系统 / 浅色 / 深色，内置 AcaNomo 默认、琥珀纸页、经典灰、GitHub 四套配色，以及引用块与 Callout 的经典 / 现代样式；可调字号、行高、正文宽度、界面缩放和 <kbd>Ctrl</kbd> + 滚轮缩放。
 - **界面语言**：可跟随系统，或选择简体中文、繁体中文、English、日本語。
 - **专注与窗口**：资源管理器、工具栏、大纲和统计可独立显示；Markdown 可进入共享当前编辑状态的可置顶小窗；主窗口可选择关闭、每次询问或隐藏到系统托盘。
 - **导出与预览**：Markdown 可导出单文件 HTML，并尽量内嵌可访问的图片；Windows / macOS PDF 会尝试根据标题写入书签。macOS Quick Look 支持 UTF-8 Markdown 的主题、代码、公式和 Mermaid 预览。
@@ -190,7 +190,7 @@ Windows NSIS 安装版与 macOS App 会向系统声明 `.md`、`.markdown`、`.t
 
 ## 技术栈与开发
 
-Nomo 使用 **Tauri 2 + Svelte 5** 构建：
+AcaNomo 使用 **Tauri 2 + Svelte 5** 构建：
 
 | 层级 | 主要技术 |
 | :--- | :--- |
@@ -267,16 +267,16 @@ pnpm run build:macos
   <a href="https://github.com/LIXianSenQwQ">
     <img src="https://img.shields.io/github/followers/LIXianSenQwQ?style=social" alt="Follow LIXianSenQwQ">
   </a>
-  <a href="https://github.com/LIXianSenQwQ/nomo">
-    <img src="https://img.shields.io/github/stars/LIXianSenQwQ/nomo?style=social" alt="Star Nomo">
+  <a href="https://github.com/chen-yu-hao/Acanomo">
+    <img src="https://img.shields.io/github/stars/chen-yu-hao/Acanomo?style=social" alt="Star AcaNomo">
   </a>
 </p>
 
-如果 Nomo 对你有帮助，欢迎关注 [LIXianSenQwQ](https://github.com/LIXianSenQwQ)，并为 [Nomo](https://github.com/LIXianSenQwQ/nomo) 点一个 Star。
+如果 AcaNomo 对你有帮助，欢迎关注 [chen-yu-hao](https://github.com/chen-yu-hao)，并为 [AcaNomo](https://github.com/chen-yu-hao/Acanomo) 点一个 Star。
 
 ## License
 
-Nomo 是自由开源软件，使用 [GNU Affero General Public License v3.0 or later](./LICENSE) 授权。你可以使用、修改和再分发 Nomo；分发 Nomo（包括修改版本）或通过网络向用户提供修改版本时，必须遵守 AGPL 并提供对应源代码。AGPL 允许商业使用和收费再分发，但下游不能取消接收者依据 AGPL 获得的权利。
+AcaNomo 是自由开源软件，使用 [GNU Affero General Public License v3.0 or later](./LICENSE) 授权。你可以使用、修改和再分发 AcaNomo；分发 AcaNomo（包括修改版本）或通过网络向用户提供修改版本时，必须遵守 AGPL 并提供对应源代码。AGPL 允许商业使用和收费再分发，但下游不能取消接收者依据 AGPL 获得的权利。
 
 如需闭源集成、专有发行或希望不受 AGPL 开源义务约束，请联系维护者商议单独的商业授权。第三方组件继续适用各自的许可证。
 
@@ -287,4 +287,3 @@ Nomo 是自由开源软件，使用 [GNU Affero General Public License v3.0 or l
 ## 致谢
 
 感谢 Tauri、Svelte、ProseMirror、CodeMirror、markdown-it、Shiki、KaTeX、Mermaid、markdownlint、GSAP、Lucide 和 Inlang 等开源项目。
-

@@ -1,0 +1,166 @@
+.translation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10003;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.43);
+}
+
+.translation-dialog {
+  width: min(720px, 100%);
+  max-height: min(720px, 90vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--md-editor-fg);
+  background: var(--md-editor-bg);
+  border: 1px solid var(--md-editor-border);
+  border-radius: 8px;
+  box-shadow: var(--md-editor-shadow-dialog);
+}
+
+.translation-header,
+.translation-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--md-editor-border);
+}
+
+.translation-header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.translation-close,
+.translation-copy,
+.translation-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.translation-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  color: var(--md-editor-muted-fg);
+  background: transparent;
+}
+
+.translation-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+.translation-direction {
+  color: var(--md-editor-muted-fg);
+  font-size: 12px;
+}
+
+.translation-pane {
+  min-height: 92px;
+  border: 1px solid var(--md-editor-border);
+  border-radius: 5px;
+  background: var(--md-editor-surface);
+}
+
+.translation-pane-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--md-editor-border);
+  color: var(--md-editor-muted-fg);
+  font-size: 12px;
+}
+
+.translation-text {
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.translation-text.original {
+  color: var(--md-editor-muted-fg);
+}
+
+.translation-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 70px;
+  padding: 12px;
+  color: var(--md-editor-muted-fg);
+  font-size: 13px;
+}
+
+.translation-state.error {
+  color: var(--md-editor-danger);
+}
+
+.translation-spinner {
+  animation: translation-spin 0.9s linear infinite;
+}
+
+.translation-copy {
+  border: 0;
+  color: var(--md-editor-accent);
+  background: transparent;
+  font-size: 11px;
+}
+
+.translation-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--md-editor-border);
+  border-bottom: 0;
+}
+
+.translation-button {
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--md-editor-border);
+  border-radius: 5px;
+  color: var(--md-editor-fg);
+  background: transparent;
+  font-size: 12px;
+}
+
+.translation-button.primary {
+  border-color: var(--md-editor-accent);
+  color: #fff;
+  background: var(--md-editor-accent);
+}
+
+.translation-button:hover,
+.translation-copy:hover,
+.translation-close:hover {
+  opacity: 0.82;
+}
+
+.translation-dialog :is(button):focus-visible {
+  outline: 2px solid var(--md-editor-accent);
+  outline-offset: 2px;
+}
+
+@keyframes translation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

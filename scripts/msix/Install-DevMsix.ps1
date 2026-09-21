@@ -29,7 +29,7 @@ if (-not $isAdministrator) {
     return
 }
 
-Write-Host '即将把 Nomo 自签名开发证书加入本地计算机 TrustedPeople，并安装开发 MSIX。'
+Write-Host '即将把 AcaNomo 自签名开发证书加入本地计算机 TrustedPeople，并安装开发 MSIX。'
 Import-Certificate -FilePath $resolvedCertificate -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
 Add-AppxPackage -Path $resolvedPackage
 Write-Host "已安装开发包：$resolvedPackage"

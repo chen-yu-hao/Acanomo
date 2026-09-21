@@ -2,10 +2,72 @@ import { describe, expect, it } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { inputRules } from 'prosemirror-inputrules';
-import { createMarkdownInputRules, parseMarkdown, serializeMarkdown } from './markdown';
+import {
+  collectMarkdownImageSources,
+  createMarkdownInputRules,
+  parseMarkdown,
+  serializeMarkdown,
+} from './markdown';
 import { schema } from './schema';
 
 describe('markdown serialization', () => {
+  it.each([
+    '   ',
+    'Before\n\n   \n\nAfter',
+    'Paragraph ',
+    ' Paragraph ',
+    '  **Paragraph** ',
+    '   Result [@D9PGQUM4] ',
+    'First \n\nMiddle  \n\nLast\t ',
+    '**bold** ',
+    '[link](https://example.test)  ',
+    'Result [@D9PGQUM4] ',
+    '# Heading ',
+    '> Quoted paragraph ',
+    '- List item ',
+    'First  \nSecond ',
+  ])('preserves editable paragraph-end whitespace when parsing %j', (markdown) => {
+    const parsed = parseMarkdown(markdown);
+    const serialized = serializeMarkdown(parsed);
+    expect(parseMarkdown(serialized).eq(parsed)).toBe(true);
+    // The existing serializer spells an internal hard break with a backslash.
+    // All other spaces, including whitespace-only paragraphs, survive exactly.
+    expect(serialized).toBe(markdown.replace(/ {2}\n(?=\S)/g, '\\\n'));
+  });
+
+  it.each([
+    ['    code', 'code_block'],
+    ['  - item', 'bullet_list'],
+    ['  > quote', 'blockquote'],
+    ['  # heading', 'heading'],
+  ])('does not restore structural indentation as paragraph text: %s', (markdown, kind) => {
+    expect(parseMarkdown(markdown).firstChild?.type.name).toBe(kind);
+  });
+
+  it.each([' ', '   ', '\t', ' \t '])(
+    'round-trips literal item indentation %j without losing marks',
+    (spaces) => {
+      const item = schema.nodes.paragraph.create(null, [
+        schema.text(`${spaces}bold`, [schema.marks.strong.create()]),
+        schema.text(' and '),
+        schema.text('code', [schema.marks.code.create()]),
+        schema.nodes.hard_break.create({ soft: true }),
+        schema.text(' code', [schema.marks.code.create()]),
+        schema.nodes.hard_break.create({ soft: true }),
+        schema.text(`${spaces}next`, [schema.marks.em.create()]),
+      ]);
+      const doc = schema.nodes.doc.create(null, [
+        schema.nodes.bullet_list.create({ tight: true }, [
+          schema.nodes.list_item.create(null, item),
+        ]),
+      ]);
+      const markdown = serializeMarkdown(doc);
+      expect(parseMarkdown(markdown).toJSON()).toEqual(doc.toJSON());
+      expect(markdown).toContain('` code`');
+      expect(serializeMarkdown(parseMarkdown(markdown))).toBe(markdown);
+    },
+  );
+
   it('preserves blank paragraphs between non-paragraph blocks', () => {
     const input = '# 标题\n\n\n\n---\n\n\n\n## 下一节';
 
@@ -417,6 +479,29 @@ describe('markdown serialization', () => {
     expect(img.attrs.src).toBe('./plain.png');
     expect(img.attrs.align).toBeNull();
     expect(img.attrs.width).toBeNull();
+  });
+
+  it('collects parser-resolved image sources with balanced parentheses and references', () => {
+    const input = [
+      '![figure](./assets/figure-(1).png)',
+      '',
+      '![supplement][supp]',
+      '',
+      '![duplicate](./assets/figure-(1).png)',
+      '',
+      '[supp]: ./assets/supplement-(final).png',
+    ].join('\n');
+
+    expect(collectMarkdownImageSources(input)).toEqual([
+      './assets/figure-(1).png',
+      './assets/supplement-(final).png',
+    ]);
+    expect(
+      collectMarkdownImageSources('<img src="./assets/with-space.png" alt="appendix">'),
+    ).toEqual(['./assets/with-space.png']);
+    expect(collectMarkdownImageSources('![windows](D:/figures/plot.png)')).toEqual([
+      'D:/figures/plot.png',
+    ]);
   });
 });
 

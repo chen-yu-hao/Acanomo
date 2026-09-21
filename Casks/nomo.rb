@@ -2,10 +2,10 @@ cask "nomo" do
   version "0.5.2"
   sha256 "4b0b5737f9528fdb56bfe86d7e9bef2cb92da2ef485dc87d73070dd7dbd9cd48"
 
-  url "https://github.com/nomo-md/nomo/releases/download/v#{version}/Nomo_#{version}_aarch64.dmg"
-  name "Nomo"
+  url "https://github.com/chen-yu-hao/Acanomo/releases/download/v#{version}/AcaNomo_#{version}_aarch64.dmg"
+  name "AcaNomo"
   desc "Local-first Markdown desktop editor"
-  homepage "https://github.com/nomo-md/nomo"
+  homepage "https://github.com/chen-yu-hao/Acanomo"
 
   livecheck do
     url :url
@@ -14,7 +14,7 @@ cask "nomo" do
 
   depends_on macos: :monterey
 
-  app "Nomo.app"
+  app "AcaNomo.app"
 
   zap trash: [
     "~/Library/Application Support/com.nomo.desktop",

@@ -48,6 +48,8 @@ export interface AppCommandHandlers {
   getDefaultDiagramType: () => Parameters<typeof isDiagramType>[0];
   exportHtml: () => void;
   exportPdf: () => void;
+  exportDocx: () => void;
+  exportLatex: () => void;
 }
 
 type ShortcutParts = {
@@ -215,6 +217,10 @@ export function executeDesktopCommand(command: string, handlers: AppCommandHandl
     handlers.exportHtml();
   } else if (command === 'export-pdf') {
     handlers.exportPdf();
+  } else if (command === 'export-docx') {
+    handlers.exportDocx();
+  } else if (command === 'export-latex') {
+    handlers.exportLatex();
   } else if (command === 'open-settings') {
     handlers.openSettings();
   }

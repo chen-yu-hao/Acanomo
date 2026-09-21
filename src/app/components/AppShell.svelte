@@ -25,7 +25,7 @@
     SplitViewLayout,
     Tab,
   } from '../types';
-  import type { ReviewDiff, ReviewHunk } from '../../lib/review/review';
+  import type { ReviewChange, ReviewDiff } from '../../lib/review/review';
   import AppTitleBar from './AppTitleBar.svelte';
   import type { MarkdownSourceEditorHandle } from './markdownSourceEditor';
   import DocumentTabs from './DocumentTabs.svelte';
@@ -197,6 +197,8 @@
   export let startResize: (event: MouseEvent) => void;
   export let exportHtml: () => void;
   export let exportPdf: () => void;
+  export let exportDocx: () => void;
+  export let exportLatex: () => void;
   export let softwareUpdateState: SoftwareUpdateSnapshot;
   export let openSoftwareUpdate: () => void;
   export let switchTab: (tabId: string) => void;
@@ -239,13 +241,17 @@
   export let reviewDiff: ReviewDiff | null = null;
   export let reviewBaselineCommit = '';
   export let reviewRepoRoot = '';
+  export let reviewMode = false;
   export let reviewBusy = false;
-  export let acceptReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
+  export let selectedChangeId = '';
+  export let toggleReviewMode: () => void = () => undefined;
+  export let acceptCurrentReview: () => void = () => undefined;
+  export let acceptReviewChange: (change: ReviewChange) => void = () => undefined;
   export let acceptAllReview: () => void = () => undefined;
   export let rejectReview: () => void = () => undefined;
   export let refreshReview: () => void = () => undefined;
   export let closeReview: () => void = () => undefined;
-  export let selectReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
+  export let selectReviewChange: (change: ReviewChange) => void = () => undefined;
 
   $: hasOpenDocument = appBootState === 'ready' && tabs.length > 0 && Boolean(activeTabId);
   $: activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
@@ -354,6 +360,13 @@
       {editAcademicSettings}
       {insertAcademicBibliography}
       {refreshAcademicData}
+      {reviewMode}
+      {reviewDiff}
+      {reviewBusy}
+      {toggleReviewMode}
+      {acceptCurrentReview}
+      {acceptAllReview}
+      {rejectReview}
       {editFrontMatter}
       {showUnavailableFeature}
       {setMode}
@@ -365,6 +378,8 @@
       {openSettings}
       {exportHtml}
       {exportPdf}
+      {exportDocx}
+      {exportLatex}
       {softwareUpdateState}
       {openSoftwareUpdate}
       {openContextMenu}
@@ -398,7 +413,7 @@
         : null}
       {startResize}
       {openContextMenu}
-      copyContextText={copyContextText}
+      {copyContextText}
       on:createNode
       on:renameNode
       on:refreshFolder
@@ -430,8 +445,8 @@
           {openFileDialog}
           {openFolderDialog}
           {openContextMenu}
-          copyContextText={copyContextText}
-          revealContextPath={revealContextPath}
+          {copyContextText}
+          {revealContextPath}
           {currentFolderPath}
           on:closeOtherTabs
           on:closeTabsToRight
@@ -563,18 +578,19 @@
               {reviewDiff}
               {reviewBaselineCommit}
               {reviewRepoRoot}
+              {selectedChangeId}
               {reviewBusy}
-              {acceptReviewHunk}
+              {acceptReviewChange}
               {acceptAllReview}
               {rejectReview}
               {refreshReview}
               {closeReview}
-              {selectReviewHunk}
+              {selectReviewChange}
               {handleEditorPaste}
               {handleEditorDrop}
               {handleWorkspaceContextMenu}
               {openContextMenu}
-              copyContextText={copyContextText}
+              {copyContextText}
               {isOutlineItemExpandable}
               {toggleOutlineItemExpanded}
               {expandAllOutline}

@@ -1,6 +1,6 @@
-# Nomo 图标资源
+# AcaNomo 图标资源
 
-本目录存放 Nomo 已接入的正式图标源图和托盘图标。
+本目录存放 AcaNomo 已接入的正式图标源图和托盘图标。
 
 ## macOS 两套图标（重要）
 
@@ -44,7 +44,7 @@ pnpm run build:macos                     # 或 pnpm tauri dev，重新编译 Rus
 ## 当前接入状态
 
 - 已按需求排除渐变版图标。
-- 已修改 `src-tauri/tauri.conf.json`，应用外显名称迁移为 Nomo。
+- 已修改 `src-tauri/tauri.conf.json`，应用外显名称迁移为 AcaNomo。
 - macOS 运行时 Dock 图标由 `src-tauri/src/window/tray.rs` 嵌入 `macos/*.png`。
 - 已将四个 24px 托盘图标纳入 `tray/`；前端主题变化通过 `set_desktop_icon_theme` 同步托盘与 Dock 图标。
 - Windows 安装态任务栏图标保持固定 bundle 图标，避免动态切换导致任务栏按钮闪烁、消失、重排或受快捷方式图标缓存影响。

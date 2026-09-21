@@ -17,6 +17,7 @@ export type {
   EditorError,
   EditorAnchorRect,
   EditorImageDeletionEvent,
+  EditorReviewDecoration,
   EditorLinkSnapshot,
   InlinePendingMarkName,
   InlinePendingMarks,

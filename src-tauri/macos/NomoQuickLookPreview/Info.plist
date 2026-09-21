@@ -6,7 +6,7 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>zh_CN</string>
   <key>CFBundleDisplayName</key>
-  <string>Nomo Quick Look</string>
+  <string>AcaNomo Quick Look</string>
   <key>CFBundleExecutable</key>
   <string>NomoQuickLookPreview</string>
   <key>CFBundleIdentifier</key>

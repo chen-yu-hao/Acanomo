@@ -1,10 +1,24 @@
-import type { ZoteroItem } from '../academic/academic';
+import type { CitationStyle, ZoteroItem } from '../academic/academic';
 import { invoke } from '@tauri-apps/api/core';
 
 export interface ZoteroStatus {
   reachable: boolean;
   baseUrl: string;
   error?: string;
+}
+
+export type ZoteroCslItem = Record<string, unknown> & { id: string };
+
+export interface ZoteroExportItem {
+  /** Zotero's stable item key, for example D9PGQUM4. */
+  key: string;
+  /** BibTeX's entry key, for example gagliardi_multiconfiguration_2017. */
+  citationKey: string;
+  bibtex: string;
+  /** CSL JSON with Zotero's canonical item URI in `id`. */
+  cslItem: ZoteroCslItem;
+  citationHtml?: string;
+  bibliographyHtml?: string;
 }
 
 const CACHE_KEY = 'nomo-zotero-metadata-v1';
@@ -73,4 +87,22 @@ export async function searchZotero(query: string): Promise<ZoteroItem[]> {
 
 export async function refreshZoteroItems(keys: readonly string[]): Promise<ZoteroItem[]> {
   return fetchZoteroItems(keys);
+}
+
+export async function fetchZoteroExportItems(
+  keys: readonly string[],
+  citationStyle: CitationStyle = 'numeric',
+): Promise<ZoteroExportItem[]> {
+  const uniqueKeys = [...new Set(keys.map((key) => key.trim()).filter(Boolean))];
+  if (!uniqueKeys.length) return [];
+  const rows: ZoteroExportItem[] = [];
+  for (let index = 0; index < uniqueKeys.length; index += 50) {
+    rows.push(
+      ...(await invoke<ZoteroExportItem[]>('zotero_export_items', {
+        keys: uniqueKeys.slice(index, index + 50),
+        citationStyle,
+      })),
+    );
+  }
+  return rows;
 }

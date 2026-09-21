@@ -8,16 +8,33 @@ import { t } from '../i18n';
  * - Unicode NFC 规范化（macOS 文件系统使用 NFD）
  */
 function normalizePathForComparison(path: string) {
-  return path
-    .replace(/\\/g, '/')
-    .replace(/\/+$/, '')
-    .toLowerCase()
-    .normalize('NFC');
+  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase().normalize('NFC');
 }
 
 /** 比较两个原生文件路径是否指向同一文件 */
 export function sameNativePath(left: string, right: string) {
   return normalizePathForComparison(left) === normalizePathForComparison(right);
+}
+
+/** Resolve a local Markdown asset source relative to its document. */
+export function resolveDocumentAssetPath(documentPath: string, source: string): string | null {
+  let raw = source.trim();
+  if (!raw) return null;
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // Keep malformed percent sequences literal; Git will validate the path.
+  }
+
+  // A Windows drive or UNC path contains a colon/backslashes that otherwise
+  // look like a URI scheme. Recognize it before filtering remote resources.
+  if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith('\\\\')) return raw;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('//')) return null;
+  if (raw.startsWith('/')) return raw;
+
+  const separatorIndex = Math.max(documentPath.lastIndexOf('/'), documentPath.lastIndexOf('\\'));
+  if (separatorIndex < 0) return raw.replace(/\\/g, '/');
+  return `${documentPath.slice(0, separatorIndex)}/${raw}`.replace(/\\/g, '/');
 }
 
 /** 检查 path 是否等于 ancestorPath 或是其子孙路径 */

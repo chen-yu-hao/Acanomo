@@ -53,7 +53,7 @@ export async function confirmAction(
     currentResolver = resolve;
     confirmDialogStore.set({
       open: true,
-      title: options.title ?? 'Nomo',
+      title: options.title ?? 'AcaNomo',
       message,
       confirmLabel: options.okLabel ?? t.discardChanges(),
       cancelLabel: options.cancelLabel ?? t.cancel(),

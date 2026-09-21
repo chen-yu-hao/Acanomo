@@ -774,7 +774,9 @@ describe('createEditorCore', () => {
 
     const levelHeading = findNodeByText(levelView.state.doc, 'heading', '标题');
     levelView.dispatch(
-      levelView.state.tr.setSelection(TextSelection.create(levelView.state.doc, levelHeading.pos + 1)),
+      levelView.state.tr.setSelection(
+        TextSelection.create(levelView.state.doc, levelHeading.pos + 1),
+      ),
     );
     expect(levelEditor.execute({ type: 'setHeading', level: 3 })).toBe(true);
     expect(levelTarget.querySelector<HTMLElement>('.toc-link')?.dataset.level).toBe('3');
@@ -1449,6 +1451,31 @@ describe('createEditorCore', () => {
     expect(dirtyEvents.at(-1)).toBe(false);
   });
 
+  it('keeps selection, undo history, and sync anchors when save only normalizes EOF', () => {
+    const target = document.createElement('div');
+    const editor = createEditorCore({ markdown: '正文', target });
+    const view = (editor as unknown as { view: EditorView }).view;
+    const insertAt = view.state.doc.content.size - 1;
+    view.dispatch(view.state.tr.insertText('修改', insertAt));
+    const stateBeforeSave = view.state;
+    const selectionBeforeSave = view.state.selection.toJSON();
+
+    editor.setMarkdown('正文修改\n\n', {
+      reason: 'save-file',
+      dirty: false,
+      savedMarkdown: '正文修改\n\n',
+      preserveHistory: true,
+    });
+
+    expect(view.state).toBe(stateBeforeSave);
+    expect(view.state.selection.toJSON()).toEqual(selectionBeforeSave);
+    expect(editor.getMarkdown()).toBe('正文修改\n\n');
+    expect(editor.getScrollSyncSnapshot().ready).toBe(true);
+    expect(editor.execute({ type: 'undo' })).toBe(true);
+    expect(editor.getMarkdown()).toBe('正文');
+    editor.destroy();
+  });
+
   it.each([
     ['# 标题', 'heading'],
     ['- 第一项\n- 第二项', 'bullet_list'],
@@ -1482,7 +1509,9 @@ describe('createEditorCore', () => {
 
     const htmlTarget = document.createElement('div');
     const htmlEditor = createEditorCore({ markdown: '', target: htmlTarget });
-    expect(htmlEditor.pasteClipboard({ text: '普通文本', html: '<strong>HTML</strong>' })).toMatchObject({
+    expect(
+      htmlEditor.pasteClipboard({ text: '普通文本', html: '<strong>HTML</strong>' }),
+    ).toMatchObject({
       format: 'html',
     });
     expect(htmlEditor.flushMarkdown()).toContain('**HTML**');
@@ -1508,7 +1537,9 @@ describe('createEditorCore', () => {
     const editor = createEditorCore({ markdown: '| A |\n| --- |\n| 单元格 |', target });
     const view = (editor as unknown as { view: EditorView }).view;
     const paragraph = findNodeByText(view.state.doc, 'paragraph', '单元格');
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, paragraph.pos + 1)));
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, paragraph.pos + 1)),
+    );
 
     expect(editor.pasteClipboard({ text: '# 标题' })).toMatchObject({ format: 'plain' });
     expect(findFirstNode(view.state.doc, 'table').node.textContent).toContain('# 标题');

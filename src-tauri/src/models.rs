@@ -152,6 +152,12 @@ pub(crate) struct ExportHtmlInput {
     pub(crate) file_path: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct ExportFileInput {
+    pub(crate) file_path: String,
+    pub(crate) bytes: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct PdfMarginsInput {
     pub(crate) top: f64,

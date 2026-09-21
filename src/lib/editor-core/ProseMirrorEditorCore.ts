@@ -32,7 +32,12 @@ import { MermaidBlockNodeView } from './nodeViews/MermaidBlockNodeView';
 import { CalloutNodeView } from './nodeViews/CalloutNodeView';
 import { HorizontalRuleNodeView } from './nodeViews/HorizontalRuleNodeView';
 import { TocBlockNodeView } from './nodeViews/TocBlockNodeView';
-import { BibliographyNodeView, CitationNodeView, EquationRefNodeView, refreshAcademicNodeViews } from './nodeViews/AcademicNodeViews';
+import {
+  BibliographyNodeView,
+  CitationNodeView,
+  EquationRefNodeView,
+  refreshAcademicNodeViews,
+} from './nodeViews/AcademicNodeViews';
 import {
   executeEditorCommand,
   insertSoftLineBreak,
@@ -79,6 +84,12 @@ import {
   type SemanticBlockAlignmentGap,
 } from './plugins/blockAlignment';
 import {
+  getReviewDecorationSpecs,
+  isReviewDecorationTransaction,
+  reviewDecorationPlugin,
+  setReviewDecorations as setReviewDecorationsTransaction,
+} from './plugins/reviewDecorations';
+import {
   createMarkdownInputRules,
   getMarkdownBlockLineMap,
   parseMarkdown,
@@ -115,16 +126,41 @@ import type {
   InlinePendingMarks,
   EditorRuntimeOptions,
   EditorImageDeletionEvent,
+  EditorReviewDecoration,
   EditorSelectionEvent,
   EditorSnapshot,
   EditorThemeOptions,
   SetMarkdownOptions,
 } from './types';
 import { isWholeWordRange } from '../search/textSearch';
-import type { EditorSyncCaret, EditorSyncSnapshot, MarkdownSyncAnchor } from './scrollSyncMapping';
+import {
+  withoutMarkdownSpaceMarks,
+  type EditorSyncCaret,
+  type EditorSyncSnapshot,
+  type MarkdownSyncAnchor,
+} from './scrollSyncMapping';
 
 const LARGE_DOCUMENT_SEMANTIC_LIMIT = 300_000;
 const MARKDOWN_SYNC_DEBOUNCE_MS = 120;
+
+function reviewDecorationsEqual(
+  current: readonly EditorReviewDecoration[],
+  next: readonly EditorReviewDecoration[],
+): boolean {
+  if (current.length !== next.length) return false;
+  return current.every((decoration, index) => {
+    const candidate = next[index];
+    return (
+      decoration.id === candidate.id &&
+      decoration.kind === candidate.kind &&
+      decoration.from === candidate.from &&
+      decoration.to === candidate.to &&
+      decoration.text === candidate.text &&
+      decoration.trailingWhitespace === candidate.trailingWhitespace &&
+      decoration.inline === candidate.inline
+    );
+  });
+}
 
 function editorThemesEqual(
   current: EditorThemeOptions | undefined,
@@ -196,6 +232,7 @@ export class ProseMirrorEditorCore implements EditorCore {
   private contentRevision = 0;
   private syncRenderRevision = 0;
   private syncSnapshot: EditorSyncSnapshot | null = null;
+  private reviewDecorationSpecs: readonly EditorReviewDecoration[] = [];
 
   constructor(private readonly options: EditorCoreOptions) {
     const initialTheme = options.theme ?? {
@@ -273,6 +310,11 @@ export class ProseMirrorEditorCore implements EditorCore {
         toc_block: (node, view, getPos) => new TocBlockNodeView(node, view, getPos as () => number),
       },
     });
+    if (this.reviewDecorationSpecs.length > 0) {
+      this.view.dispatch(
+        setReviewDecorationsTransaction(this.view.state.tr, this.reviewDecorationSpecs),
+      );
+    }
     this.refreshInitialEditableState();
   }
 
@@ -338,28 +380,47 @@ export class ProseMirrorEditorCore implements EditorCore {
 
   getScrollSyncSnapshot(): EditorSyncSnapshot {
     if (!this.view || this.semanticViewDirty || this.pendingMarkdownDoc) {
-      return { revision: this.contentRevision, renderRevision: this.syncRenderRevision,
-        ready: false, markdown: this.markdown, anchors: [] };
+      return {
+        revision: this.contentRevision,
+        renderRevision: this.syncRenderRevision,
+        ready: false,
+        markdown: this.markdown,
+        anchors: [],
+      };
     }
     if (this.syncSnapshot?.revision === this.contentRevision) return this.syncSnapshot;
     const parsed = parseMarkdownWithSyncAnchors(this.markdown);
     const currentDoc = this.view.state.doc;
     // 复杂块的序列化可能多出软换行。用结构差异的已确认前后缀换算偏移，
     // 不能因局部节点长度不同而丢弃后续整篇锚点，也不按块数或文字搜索猜位置。
-    const diffStart = parsed.doc.content.findDiffStart(currentDoc.content);
-    const diffEnd = diffStart == null ? null : parsed.doc.content.findDiffEnd(currentDoc.content);
-    const anchors = parsed.anchors.flatMap((anchor) => {
+    const comparableParsed = withoutMarkdownSpaceMarks(parsed.doc);
+    const comparableCurrent = withoutMarkdownSpaceMarks(currentDoc);
+    const diffStart = comparableParsed.content.findDiffStart(comparableCurrent.content);
+    const diffEnd =
+      diffStart == null ? null : comparableParsed.content.findDiffEnd(comparableCurrent.content);
+    const anchors: MarkdownSyncAnchor[] = parsed.anchors.flatMap((anchor) => {
       if (diffEnd && anchor.pos >= (diffStart ?? 0) && anchor.pos < diffEnd.a) return [];
       const shift =
-        diffEnd && anchor.pos >= Math.max(diffStart ?? 0, diffEnd.a)
-          ? diffEnd.b - diffEnd.a
-          : 0;
+        diffEnd && anchor.pos >= Math.max(diffStart ?? 0, diffEnd.a) ? diffEnd.b - diffEnd.a : 0;
       const pos = anchor.pos + shift;
       if (pos < 0 || pos >= currentDoc.content.size) return [];
-      const expected = parsed.doc.nodeAt(anchor.pos);
-      const actual = currentDoc.nodeAt(pos);
+      const expected = comparableParsed.nodeAt(anchor.pos);
+      const actual = comparableCurrent.nodeAt(pos);
       return expected != null && actual != null && expected.eq(actual)
-        ? [{ ...anchor, pos, endPos: anchor.endPos + shift }]
+        ? [
+            {
+              ...anchor,
+              pos,
+              endPos: anchor.endPos + shift,
+              textContent: actual.textContent,
+              contentSize: actual.content.size,
+              inlineSegments: anchor.inlineSegments?.map((segment) => ({
+                ...segment,
+                posStart: segment.posStart + shift,
+                posEnd: segment.posEnd + shift,
+              })),
+            },
+          ]
         : [];
     });
     const lines = this.markdown.split('\n');
@@ -367,23 +428,43 @@ export class ProseMirrorEditorCore implements EditorCore {
     for (let index = 1; index < topLevel.length; index += 1) {
       const previous = topLevel[index - 1];
       const next = topLevel[index];
-      if (next.fromLine > previous.toLine + 1 &&
-          lines.slice(previous.toLine, next.fromLine - 1).every((line) => !line.trim())) {
-        anchors.push({ ...previous, key: `${previous.pos}:blank`, kind: 'blank', edge: 'end',
-          fromLine: previous.toLine + 1, toLine: next.fromLine - 1 });
+      if (
+        next.fromLine > previous.toLine + 1 &&
+        lines.slice(previous.toLine, next.fromLine - 1).every((line) => !line.trim())
+      ) {
+        anchors.push({
+          ...previous,
+          key: `${previous.pos}:blank`,
+          kind: 'blank',
+          edge: 'end',
+          fromLine: previous.toLine + 1,
+          toLine: next.fromLine - 1,
+        });
       }
     }
     const eofLine = lines.length + 1;
     if (currentDoc.childCount > 0) {
       const lastPos = currentDoc.content.size - currentDoc.lastChild!.nodeSize;
-      anchors.push({ key: 'eof', fromLine: eofLine, toLine: eofLine, pos: lastPos,
-        endPos: currentDoc.content.size, kind: 'eof', edge: 'end', depth: 0 });
+      anchors.push({
+        key: 'eof',
+        fromLine: eofLine,
+        toLine: eofLine,
+        pos: lastPos,
+        endPos: currentDoc.content.size,
+        kind: 'eof',
+        edge: 'end',
+        depth: 0,
+      });
     }
     this.syncSnapshot = {
       revision: this.contentRevision,
       renderRevision: this.syncRenderRevision,
-      ready: anchors.some((anchor) => anchor.kind !== 'eof') || Boolean(currentDoc.attrs.frontMatterPrefix),
-      markdown: this.markdown, anchors,
+      ready:
+        anchors.some((anchor) => anchor.kind !== 'eof') ||
+        Boolean(currentDoc.attrs.frontMatterPrefix) ||
+        !this.markdown.trim(),
+      markdown: this.markdown,
+      anchors,
     };
     return this.syncSnapshot;
   }
@@ -398,14 +479,23 @@ export class ProseMirrorEditorCore implements EditorCore {
     if (anchor.edge === 'line') {
       const content = element.querySelector<HTMLElement>('.code-content');
       const code = content?.querySelector<HTMLElement>('code');
-      if (!content || !code || element.classList.contains('is-editing') ||
-          content.scrollHeight > content.clientHeight + 1 || content.scrollTop > 0) return null;
+      if (
+        !content ||
+        !code ||
+        element.classList.contains('is-editing') ||
+        content.scrollHeight > content.clientHeight + 1 ||
+        content.scrollTop > 0
+      )
+        return null;
       const style = getComputedStyle(code);
-      const scale = code.offsetHeight > 0 ? code.getBoundingClientRect().height / code.offsetHeight : 1;
+      const scale =
+        code.offsetHeight > 0 ? code.getBoundingClientRect().height / code.offsetHeight : 1;
       const lineHeight = Number.parseFloat(style.lineHeight);
       if (!Number.isFinite(lineHeight)) return null;
-      const top = code.getBoundingClientRect().top +
-        ((Number.parseFloat(style.paddingTop) || 0) + (anchor.lineOffset ?? 0) * lineHeight) * scale;
+      const top =
+        code.getBoundingClientRect().top +
+        ((Number.parseFloat(style.paddingTop) || 0) + (anchor.lineOffset ?? 0) * lineHeight) *
+          scale;
       return { top, bottom: top + lineHeight * scale };
     }
     return rect;
@@ -427,6 +517,22 @@ export class ProseMirrorEditorCore implements EditorCore {
     } catch {
       return { head, blockOnly: true };
     }
+  }
+
+  setReviewDecorations(decorations: readonly EditorReviewDecoration[]): void {
+    this.assertActive();
+    const current = this.view
+      ? getReviewDecorationSpecs(this.view.state)
+      : this.reviewDecorationSpecs;
+    if (reviewDecorationsEqual(current, decorations)) {
+      // Keep the mapped plugin state as the source of truth. In particular,
+      // ordinary edits may have moved a widget since the last public update.
+      this.reviewDecorationSpecs = current;
+      return;
+    }
+    this.reviewDecorationSpecs = [...decorations];
+    if (!this.view) return;
+    this.view.dispatch(setReviewDecorationsTransaction(this.view.state.tr, decorations));
   }
 
   getBlockAlignmentGeometry(anchors: Array<{ key: string; nodeIndex: number }>) {
@@ -571,6 +677,17 @@ export class ProseMirrorEditorCore implements EditorCore {
     }
 
     this.dirty = options?.dirty ?? this.markdown !== this.originalMarkdown;
+    if (
+      options?.preserveHistory === true &&
+      this.view &&
+      this.view.state.doc.eq(this.parseSemanticDocument(this.markdown).doc)
+    ) {
+      // Save normalization may only change trailing newlines. Keep the
+      // existing state when the semantic document is unchanged.
+      this.semanticViewDirty = false;
+      this.emit(options?.reason ?? 'programmatic-update');
+      return;
+    }
     if (delaySemanticSync) {
       this.semanticViewDirty = true;
       if (shouldReportImageDeletion(options)) {
@@ -1152,6 +1269,7 @@ export class ProseMirrorEditorCore implements EditorCore {
       plugins: [
         windowsImePunctuationFallbackPlugin(),
         blockAlignmentPlugin(),
+        reviewDecorationPlugin(),
         inputRules({
           rules: createMarkdownInputRules(),
         }),
@@ -1384,12 +1502,20 @@ export class ProseMirrorEditorCore implements EditorCore {
     const previousSelection = this.view.state.selection;
     const nextState = this.view.state.apply(transaction);
     this.view.updateState(nextState);
+    // Keep the public-core copy in sync with ProseMirror's mapped specs. A
+    // normal edit moves a decoration through transaction.mapping, so retaining
+    // the last setter input would restore it at stale positions on a later
+    // semantic view rebuild.
+    this.reviewDecorationSpecs = [...getReviewDecorationSpecs(nextState)];
     if (transaction.docChanged) {
       refreshAcademicNodeViews(this.view);
       MathBlockNodeView.refreshAll(this.view);
     }
 
-    if (isSemanticBlockAlignmentTransaction(transaction)) {
+    if (
+      isSemanticBlockAlignmentTransaction(transaction) ||
+      isReviewDecorationTransaction(transaction)
+    ) {
       return;
     }
 
@@ -1413,7 +1539,11 @@ export class ProseMirrorEditorCore implements EditorCore {
 
   private createSelectionEvent(): EditorSelectionEvent {
     if (!this.view || this.view.state.selection.empty) {
-      return { selection: null, selectedMarkdown: '', caret: this.getScrollSyncCaret() ?? undefined };
+      return {
+        selection: null,
+        selectedMarkdown: '',
+        caret: this.getScrollSyncCaret() ?? undefined,
+      };
     }
 
     const { doc, selection } = this.view.state;
@@ -1481,10 +1611,24 @@ export class ProseMirrorEditorCore implements EditorCore {
     }
 
     const nextState = this.createState(markdown);
+    const preserveReviewDecorations = this.view.state.doc.eq(nextState.doc);
+    if (preserveReviewDecorations) {
+      // The plugin has already mapped these specs through any edits since the
+      // last call to setReviewDecorations(). Capture that state before the old
+      // EditorState is replaced.
+      this.reviewDecorationSpecs = [...getReviewDecorationSpecs(this.view.state)];
+    }
     this.syncRenderRevision += 1;
     this.syncSnapshot = null;
     this.blockAlignmentGaps.clear();
     this.view.updateState(selection ? this.restoreSelection(nextState, selection) : nextState);
+    if (preserveReviewDecorations && this.reviewDecorationSpecs.length > 0) {
+      this.view.dispatch(
+        setReviewDecorationsTransaction(this.view.state.tr, this.reviewDecorationSpecs),
+      );
+    } else if (!preserveReviewDecorations) {
+      this.reviewDecorationSpecs = [];
+    }
     this.semanticViewDirty = false;
   }
 

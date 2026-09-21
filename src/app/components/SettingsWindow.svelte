@@ -86,8 +86,8 @@
   import nomoLogoDark from '../../../src-tauri/icons/nomo/source/nomo-app-dark-128.png?url';
   import nomoLogoLight from '../../../src-tauri/icons/nomo/source/nomo-app-light-128.png?url';
 
-  const GITHUB_REPOSITORY_URL = 'https://github.com/nomo-md/nomo';
-  const GITHUB_ISSUE_URL = 'https://github.com/nomo-md/nomo/issues/new/choose';
+  const GITHUB_REPOSITORY_URL = 'https://github.com/chen-yu-hao/Acanomo';
+  const GITHUB_ISSUE_URL = 'https://github.com/chen-yu-hao/Acanomo/issues/new/choose';
 
   type CategoryId =
     | 'general'
@@ -2587,7 +2587,7 @@
                   <img class="logo-dark" src={nomoLogoDark} alt="" draggable="false" />
                 </div>
                 <div class="about-identity-copy">
-                  <h2>Nomo</h2>
+                  <h2>AcaNomo</h2>
                   <span
                     class="about-version-badge"
                     aria-label={`${t.version()} ${packageInfo.version}`}

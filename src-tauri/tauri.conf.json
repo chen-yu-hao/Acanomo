@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Nomo",
+  "productName": "AcaNomo",
   "version": "0.5.4",
   "identifier": "com.nomo.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Nomo",
+        "title": "AcaNomo",
         "width": 1180,
         "height": 760,
         "minWidth": 920,

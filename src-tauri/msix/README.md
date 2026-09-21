@@ -1,7 +1,7 @@
-# Nomo MSIX build
+# AcaNomo MSIX build
 
 `package-identity.json` is the only committed source of MSIX identity values. It contains the
-Partner Center identity and reserved display name `Nomo Markdown` for Store product `9P1G24GK650Z`. `ApplicationId` remains `Nomo`, so the
+Partner Center identity and reserved display name `AcaNomo Markdown` for Store product `9P1G24GK650Z`. `ApplicationId` remains `Nomo`, so the
 runtime AUMID is always calculated as `<current PFN>!Nomo`.
 
 Development package:

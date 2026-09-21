@@ -6,10 +6,30 @@ import type { EditorView } from 'prosemirror-view';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+// Keep this contract independent of edits to the repository's README.
+const scrollSyncFixture = [
+  '<p align="center">',
+  '<img src="logo.png" width="120">',
+  '</p>',
+  '',
+  ...Array.from({ length: 12 }, (_, index) => [
+    `## Section ${index + 1}`,
+    '',
+    'A long editable paragraph with enough context to verify all source anchors after an edit.',
+    '',
+    '| Name | Value |',
+    '| :--- | :--- |',
+    '| **First** | [link](https://example.test) |',
+    '| Second | plain text |',
+    '',
+  ]).flat(),
+  'Final paragraph after the last table.',
+].join('\n');
+
 describe('Markdown source provenance for scroll synchronization', () => {
-  it('keeps proven suffix anchors when typing beside the leading aligned image in README', () => {
+  it('keeps proven suffix anchors when typing beside a leading aligned image', () => {
     const editor = createEditorCore({
-      markdown: readFileSync(resolve(process.cwd(), 'README.md'), 'utf8'),
+      markdown: scrollSyncFixture,
       target: document.createElement('div'),
     });
     try {
@@ -41,11 +61,14 @@ describe('Markdown source provenance for scroll synchronization', () => {
     }
   });
 
-  it.each(['README.md', 'sample.md'])(
+  it.each(['fixture', 'sample.md'])(
     'retains reliable anchors beyond complex tables after editing %s',
     (file) => {
       const editor = createEditorCore({
-        markdown: readFileSync(resolve(process.cwd(), file), 'utf8'),
+        markdown:
+          file === 'fixture'
+            ? scrollSyncFixture
+            : readFileSync(resolve(process.cwd(), file), 'utf8'),
         target: document.createElement('div'),
       });
       try {

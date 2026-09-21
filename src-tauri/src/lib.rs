@@ -291,7 +291,9 @@ pub fn run() {
             crate::zotero::zotero_status,
             crate::zotero::zotero_items,
             crate::zotero::zotero_search,
+            crate::zotero::zotero_export_items,
             crate::export::export_html,
+            crate::export::export_file,
             crate::export::export_pdf_from_html,
             crate::export::read_file_as_base64,
             crate::file_system::read_markdown_file,
@@ -386,7 +388,7 @@ pub fn run() {
             crate::external_link::reveal_in_explorer
         ])
         .build(context)
-        .expect("error while building Nomo")
+        .expect("error while building AcaNomo")
         .run(|_app, _event| {
             #[cfg(target_os = "macos")]
             match _event {

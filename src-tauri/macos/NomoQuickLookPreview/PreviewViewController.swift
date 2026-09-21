@@ -197,10 +197,10 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
         loadErrorPreview(error)
     }
 
-    /// 从 Nomo 原生配置中读取 Quick Look 所需的外观偏好。
+    /// 从 AcaNomo 原生配置中读取 Quick Look 所需的外观偏好。
     ///
     /// 扩展只读取主应用配置中的三个主题标识，颜色与样式 token 仍由内嵌前端的同一主题注册表解析。
-    /// 精确的只读沙盒例外由扩展 entitlements 限定到 Nomo 的 Application Support 目录。
+    /// 精确的只读沙盒例外由扩展 entitlements 限定到 AcaNomo 的 Application Support 目录。
     ///
     /// - Returns: 至少包含一个有效字符串设置时返回外观偏好字典；配置尚未包含主题设置时返回 `nil`。
     /// - Throws: 无法定位用户主目录、读取配置或解析配置 JSON 时抛出。
@@ -239,7 +239,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
     ///
     /// Foundation 的 home-directory API 在沙盒扩展中可能返回扩展容器目录，无法与
     /// home-relative 临时只读例外对应。POSIX 账户记录保留真实主目录，且本方法只用于
-    /// 拼接固定的 Nomo 配置相对路径，不接受文档内容或其他外部输入。
+    /// 拼接固定的 AcaNomo 配置相对路径，不接受文档内容或其他外部输入。
     ///
     /// - Returns: 当前有效用户的绝对主目录 URL，已按目录语义创建。
     /// - Throws: 账户记录缺失、主目录不是有效 UTF-8 或返回空路径时抛出 `userHomeUnavailable`。
@@ -266,7 +266,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
             <html lang="zh-CN">
               <body style="margin:0;display:grid;min-height:100vh;place-items:center;font:14px -apple-system,BlinkMacSystemFont,sans-serif;color:#68707a;background:#fff;">
                 <main style="display:grid;gap:8px;text-align:center;padding:24px;">
-                  <strong style="color:#202428;font-size:16px;">无法生成 Nomo 预览</strong>
+                  <strong style="color:#202428;font-size:16px;">无法生成 AcaNomo 预览</strong>
                   <span>\(message)</span>
                 </main>
               </body>
@@ -294,7 +294,7 @@ private enum PreviewError: Error, CustomStringConvertible {
         case .userHomeUnavailable:
             return "无法定位用户主目录"
         case .appearanceConfigurationMalformed:
-            return "Nomo 外观配置格式无效"
+            return "AcaNomo 外观配置格式无效"
         }
     }
 }

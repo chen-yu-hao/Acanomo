@@ -76,6 +76,18 @@ export interface EditorSearchMatch {
   text: string;
 }
 
+/** Temporary, non-persistent decoration used by Git review mode. */
+export interface EditorReviewDecoration {
+  id: string;
+  kind: 'added' | 'deleted';
+  from: number;
+  to: number;
+  text?: string;
+  trailingWhitespace?: string;
+  /** Inline marks use text/widget decorations; omitted means block-level. */
+  inline?: boolean;
+}
+
 export interface EditorSnapshot {
   markdown: string;
   version: number;
@@ -225,6 +237,7 @@ export interface EditorCore {
   getScrollSyncSnapshot(): EditorSyncSnapshot;
   getScrollSyncAnchorRect(anchor: MarkdownSyncAnchor): { top: number; bottom: number } | null;
   getScrollSyncCaret(): EditorSyncCaret | null;
+  setReviewDecorations(decorations: readonly EditorReviewDecoration[]): void;
   setMarkdown(markdown: string, options?: SetMarkdownOptions): void;
   setDirty(dirty: boolean): void;
   getSnapshot(): EditorSnapshot;

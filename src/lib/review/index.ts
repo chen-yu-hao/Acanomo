@@ -1,8 +1,15 @@
 export {
+  buildReviewSourceDecorations,
   buildUnifiedPatch,
   computeReviewDiff,
+  type ReviewChange,
   type ReviewChangeKind,
+  type ReviewDeletedLine,
   type ReviewDiff,
+  type ReviewDiffLine,
+  type ReviewDiffLineKind,
   type ReviewHunk,
+  type ReviewInlineChange,
+  type ReviewInlineEdit,
+  type ReviewSourceDecoration,
 } from './review';
-

@@ -71,6 +71,11 @@
   text-decoration-color: var(--md-review-added, #2563eb);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+
+.source-editor .review-added-trailing-whitespace {
+  white-space: break-spaces;
 }
 
 .source-editor .review-deleted-line {
@@ -79,10 +84,13 @@
   min-height: 1.75em;
   padding: 0 0.5rem;
   color: var(--md-editor-fg);
-  background: color-mix(in srgb, var(--md-review-deleted, #dc2626) 9%, transparent);
   text-decoration-line: line-through;
   text-decoration-color: var(--md-review-deleted, #dc2626);
   text-decoration-thickness: 2px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.source-editor .review-deleted-trailing-whitespace {
+  white-space: break-spaces;
 }

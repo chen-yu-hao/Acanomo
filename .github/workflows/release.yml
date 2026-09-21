@@ -110,7 +110,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: '-'
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Nomo ${{ github.ref_name }}
+          releaseName: AcaNomo ${{ github.ref_name }}
           releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
@@ -122,9 +122,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = '${{ github.ref_name }}' -replace '^v', ''
-          $zipRoot = Join-Path $env:RUNNER_TEMP 'nomo-x64'
-          $appDir = Join-Path $zipRoot 'Nomo'
-          $zipPath = Join-Path $env:GITHUB_WORKSPACE "Nomo_${version}_x64.zip"
+          $zipRoot = Join-Path $env:RUNNER_TEMP 'acanomo-x64'
+          $appDir = Join-Path $zipRoot 'AcaNomo'
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "AcaNomo_${version}_x64.zip"
 
           Remove-Item -LiteralPath $zipRoot -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
@@ -136,14 +136,14 @@ jobs:
           }
 
           Compress-Archive -LiteralPath $appDir -DestinationPath $zipPath -Force
-          "NOMO_ZIP_PATH=$zipPath" >> $env:GITHUB_ENV
+          "ACANOMO_ZIP_PATH=$zipPath" >> $env:GITHUB_ENV
 
       - name: Upload Windows zip release asset
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload '${{ github.ref_name }}' "$env:NOMO_ZIP_PATH" --clobber
+        run: gh release upload '${{ github.ref_name }}' "$env:ACANOMO_ZIP_PATH" --clobber
 
   checksums:
     name: Publish MD5 checksums
@@ -196,7 +196,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          asset="Nomo_${version}_aarch64.dmg"
+          asset="AcaNomo_${version}_aarch64.dmg"
           gh release download "$TAG" --pattern "$asset" --dir /tmp
           sha256="$(sha256sum "/tmp/$asset" | awk '{print $1}')"
           sed -i -E \

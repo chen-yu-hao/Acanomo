@@ -12,8 +12,8 @@ const startupTimer = createPerfTimer('App', '前端入口加载');
 initializeLogger();
 
 if (!target) {
-  logError('App', 'Nomo app root was not found.');
-  throw new Error('Nomo app root was not found.');
+  logError('App', 'AcaNomo app root was not found.');
+  throw new Error('AcaNomo app root was not found.');
 }
 
 const uninstallAutoHideScrollbars = installAutoHideScrollbars();
@@ -42,7 +42,7 @@ const app = rootComponentPromise
     return mountedApp;
   })
   .catch((error) => {
-    logError('App', 'Failed to mount Nomo app root.', {
+    logError('App', 'Failed to mount AcaNomo app root.', {
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;

@@ -158,6 +158,11 @@ interface ExportHtmlInput {
   file_path: string;
 }
 
+interface ExportFileInput {
+  file_path: string;
+  bytes: number[];
+}
+
 interface ExportPdfInput {
   html_content: string;
   file_path: string;
@@ -374,9 +379,15 @@ export async function acceptAllGitReview(
   );
 }
 
-export async function rejectGitReview(path: string, assets: string[] = []): Promise<void> {
+export async function rejectGitReview(
+  path: string,
+  assets: string[] = [],
+  untrackedAssets: string[] = [],
+): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('git_review_reject', { input: { path, assets } });
+  await invoke('git_review_reject', {
+    input: { path, assets, untracked_assets: untrackedAssets },
+  });
 }
 
 export async function checkPathsExist(paths: string[]): Promise<boolean[]> {
@@ -578,6 +589,15 @@ export async function exportHtmlFile(input: ExportHtmlInput): Promise<ExportResu
   logInfo('tauriStorage', '导出 HTML 文件', { filePath: input.file_path });
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<ExportResultPayload>('export_html', { input });
+}
+
+export async function exportFile(input: ExportFileInput): Promise<ExportResultPayload> {
+  logInfo('tauriStorage', '导出文件', {
+    filePath: input.file_path,
+    bytes: input.bytes.length,
+  });
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<ExportResultPayload>('export_file', { input });
 }
 
 export async function exportPdfFromHtml(input: ExportPdfInput): Promise<ExportResultPayload> {

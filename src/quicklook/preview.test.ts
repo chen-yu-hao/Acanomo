@@ -123,7 +123,7 @@ describe('quicklook preview renderer', () => {
 
   it('marks shields badges so they keep GitHub-like inline sizing', () => {
     const html = renderMarkdownPreview(
-      '![Release](https://img.shields.io/github/v/release/LIXianSenQwQ/nomo?label=release)',
+      '![Release](https://img.shields.io/github/v/release/chen-yu-hao/Acanomo?label=release)',
     );
 
     expect(html).toContain('class="image-badge"');

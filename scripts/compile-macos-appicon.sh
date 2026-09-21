@@ -189,7 +189,7 @@ payload = {
                 },
             ],
             "lighting": "combined",
-            "name": "Nomo",
+                    "name": "AcaNomo",
             "shadow": {"kind": "none", "opacity": 0},
             "specular": False,
             "translucency": {"enabled": False, "value": 0},

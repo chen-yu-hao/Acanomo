@@ -22,7 +22,7 @@
   import { syncEditorPanes } from '../services/markdownScrollSyncWorkspace';
   import { t } from '../i18n';
   import type { EditorViewMode, SplitActivePane, SplitViewLayout } from '../types';
-  import type { ReviewDiff, ReviewHunk } from '../../lib/review/review';
+  import type { ReviewChange, ReviewDiff } from '../../lib/review/review';
   import ReviewPanel from './ReviewPanel.svelte';
 
   export let interfaceLocale: string;
@@ -82,12 +82,13 @@
   export let reviewBaselineCommit = '';
   export let reviewRepoRoot = '';
   export let reviewBusy = false;
-  export let acceptReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
+  export let selectedChangeId = '';
+  export let acceptReviewChange: (change: ReviewChange) => void = () => undefined;
   export let acceptAllReview: () => void = () => undefined;
   export let rejectReview: () => void = () => undefined;
   export let refreshReview: () => void = () => undefined;
   export let closeReview: () => void = () => undefined;
-  export let selectReviewHunk: (hunk: ReviewHunk) => void = () => undefined;
+  export let selectReviewChange: (change: ReviewChange) => void = () => undefined;
 
   interface PendingOutlineDrag {
     pointerId: number;
@@ -330,12 +331,12 @@
       if (!layout || !editorSurface || !contentEnd) return null;
 
       const sourceFrame = paneMode === 'source' ? getSplitSourceFrame() : null;
-      const scrollElement =
-        paneMode === 'source' ? sourceEditor?.getScrollElement() : pane;
+      const scrollElement = paneMode === 'source' ? sourceEditor?.getScrollElement() : pane;
       if (!scrollElement || scrollElement.clientHeight <= 0) return null;
 
       const layoutBottomPadding = Number.parseFloat(getComputedStyle(layout).paddingBottom) || 0;
-      const bottomPadding = paneMode === 'source' ? (sourceFrame?.bottom ?? 0) / getEditorZoom() : layoutBottomPadding;
+      const bottomPadding =
+        paneMode === 'source' ? (sourceFrame?.bottom ?? 0) / getEditorZoom() : layoutBottomPadding;
       if (sourceFrame && syncSplitSourceFrame(pane, sourceFrame.top, sourceFrame.bottom)) {
         scheduleUpdate();
         return null;
@@ -795,250 +796,251 @@
 
 {#key interfaceLocale}
   <div class="editor-review-layout" class:review-active={reviewDiff !== null}>
-  <div
-    bind:this={editorGrid}
-    class="editor-grid"
-    class:source-only={mode === 'source'}
-    class:split-view={mode === 'split'}
-    class:split-semantic-source={mode === 'split' && splitViewLayout === 'semantic-source'}
-    class:split-source-semantic={mode === 'split' && splitViewLayout === 'source-semantic'}
-    class:split-resizing={splitResizePointerId !== null}
-    style={`--split-left-track: ${splitLeftPercent}fr; --split-right-track: ${100 - splitLeftPercent}fr`}
-    use:coordinateEditorPaneGeometry={{ mode, contentVersion: markdown }}
-    use:syncEditorPanes={{
-      mode,
-      documentId: sourceDocumentId,
-      markdown,
-      sourceEditor,
-      editorCore,
-      largeDocumentMode,
-      activePane: splitActivePane,
-      paused: splitResizePointerId !== null,
-    }}
-    use:modePaneMotion={{ mode, disabled: largeDocumentMode }}
-  >
-    <section
-      id="source-editor-pane"
-      bind:this={sourcePaneContainer}
-      class="editor-pane source-pane"
-      class:split-pane-left={splitViewLayout === 'source-semantic'}
-      class:split-pane-right={splitViewLayout === 'semantic-source'}
-      class:split-pane-active={mode === 'split' && splitActivePane === 'source'}
-      aria-label={t.markdownSource()}
-      on:contextmenu|preventDefault
-      on:pointerdown={() => mode === 'split' && setSplitActivePane('source')}
-      on:focusin={() => mode === 'split' && setSplitActivePane('source')}
-    >
-      <div class="document-layout">
-        <MarkdownSourceEditor
-          bind:sourceEditor
-          {markdown}
-          documentId={sourceDocumentId}
-          {readonlyDocumentMode}
-          {reviewDiff}
-          onMarkdownChange={updateMarkdown}
-          onSelectionChange={(selected) => {
-            onSourceSelectionChange(selected);
-            editorGrid?.dispatchEvent(new Event('nomo:source-caret-change'));
-          }}
-          onLayoutChange={() => editorGrid?.dispatchEvent(new Event('nomo:source-layout-change'))}
-          onPaste={handleEditorPaste}
-          onDrop={handleEditorDrop}
-          onReady={handleSourceEditorReady}
-          onScroll={() => {
-            updateActiveOutlineFromSourceScroll();
-            onSourceScroll?.();
-          }}
-        />
-      </div>
-    </section>
-
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
     <div
-      class="split-divider"
-      class:active={splitResizePointerId !== null}
-      role="separator"
-      aria-label={t.splitDivider()}
-      aria-hidden={mode !== 'split'}
-      aria-orientation="vertical"
-      aria-controls="semantic-editor-pane source-editor-pane"
-      aria-valuemin="25"
-      aria-valuemax="75"
-      aria-valuenow={Math.round(splitLeftPercent)}
-      tabindex={mode === 'split' ? 0 : -1}
-      on:pointerdown={handleSplitResizePointerDown}
-      on:pointermove={handleSplitResizePointerMove}
-      on:pointerup={finishSplitResize}
-      on:pointercancel={finishSplitResize}
-      on:lostpointercapture={finishSplitResize}
-      on:keydown={handleSplitResizeKeydown}
-    ></div>
-
-    {#if mode === 'split' && !largeDocumentMode}
-      <div
-        class="split-alignment-guide"
-        class:visible={splitAlignmentGuideVisible}
-        aria-hidden="true"
-      ></div>
-    {/if}
-
-    <section
-      id="semantic-editor-pane"
-      bind:this={semanticPane}
-      class="semantic-pane"
-      class:split-pane-left={splitViewLayout === 'semantic-source'}
-      class:split-pane-right={splitViewLayout === 'source-semantic'}
-      class:split-pane-active={mode === 'split' && splitActivePane === 'semantic'}
-      aria-label={t.semanticEditorArea()}
-      on:scroll={() => {
-        updateActiveOutlineFromSemanticScroll();
-        onSemanticScroll?.();
+      bind:this={editorGrid}
+      class="editor-grid"
+      class:source-only={mode === 'source'}
+      class:split-view={mode === 'split'}
+      class:split-semantic-source={mode === 'split' && splitViewLayout === 'semantic-source'}
+      class:split-source-semantic={mode === 'split' && splitViewLayout === 'source-semantic'}
+      class:split-resizing={splitResizePointerId !== null}
+      style={`--split-left-track: ${splitLeftPercent}fr; --split-right-track: ${100 - splitLeftPercent}fr`}
+      use:coordinateEditorPaneGeometry={{ mode, contentVersion: markdown }}
+      use:syncEditorPanes={{
+        mode,
+        documentId: sourceDocumentId,
+        markdown,
+        sourceEditor,
+        editorCore,
+        largeDocumentMode,
+        activePane: splitActivePane,
+        paused: splitResizePointerId !== null,
       }}
-      on:paste={handleEditorPaste}
-      on:drop={handleEditorDrop}
-      on:dragover|preventDefault
-      on:contextmenu={handleSemanticContextMenu}
-      on:pointerdown={() => mode === 'split' && setSplitActivePane('semantic')}
-      on:focusin={() => mode === 'split' && setSplitActivePane('semantic')}
+      use:modePaneMotion={{ mode, disabled: largeDocumentMode }}
     >
-      <div class="document-layout">
-        {#if frontMatter}
-          <FrontMatterCard
-            {frontMatter}
-            {interfaceLocale}
-            editing={frontMatterEditing}
-            focusRequest={frontMatterFocusRequest}
-            focusTarget={frontMatterFocusTarget}
-            readonly={readonlyDocumentMode}
-            enterEdit={enterFrontMatterEdit}
-            leaveEdit={leaveFrontMatterEdit}
-            updateContent={updateFrontMatterContent}
-            {deleteFrontMatter}
-          />
-        {/if}
-        <div bind:this={editorHost} class="prosemirror-host"></div>
-        <div class="editor-scroll-past-end" data-scroll-past-end aria-hidden="true"></div>
-      </div>
-    </section>
-
-    {#if outlineVisible}
-      <aside
-        bind:this={outlinePanel}
-        class="content-outline"
-        class:outline-dragging={outlineDragging}
-        class:outline-readonly={readonlyDocumentMode}
-        aria-label={t.documentOutline()}
-        transition:outlinePanelTransition
-        on:contextmenu={handleOutlineContextMenu}
+      <section
+        id="source-editor-pane"
+        bind:this={sourcePaneContainer}
+        class="editor-pane source-pane"
+        class:split-pane-left={splitViewLayout === 'source-semantic'}
+        class:split-pane-right={splitViewLayout === 'semantic-source'}
+        class:split-pane-active={mode === 'split' && splitActivePane === 'source'}
+        aria-label={t.markdownSource()}
+        on:contextmenu|preventDefault
+        on:pointerdown={() => mode === 'split' && setSplitActivePane('source')}
+        on:focusin={() => mode === 'split' && setSplitActivePane('source')}
       >
-        <div class="content-outline-header">
-          <strong>{t.documentOutline()}</strong>
-          {#if hasExpandableOutline}
-            <button
-              type="button"
-              class="outline-bulk-toggle"
-              title={hasCollapsedExpandableOutline
-                ? t.expandAllOutline()
-                : t.collapseOutlineToDefaultLevel()}
-              aria-label={hasCollapsedExpandableOutline
-                ? t.expandAllOutline()
-                : t.collapseOutlineToDefaultLevel()}
-              on:click={toggleAllOutlineItems}
-            >
-              {#if hasCollapsedExpandableOutline}
-                <ChevronsUpDown size={15} />
-              {:else}
-                <ChevronsDownUp size={15} />
-              {/if}
-            </button>
-          {/if}
+        <div class="document-layout">
+          <MarkdownSourceEditor
+            bind:sourceEditor
+            {markdown}
+            documentId={sourceDocumentId}
+            {readonlyDocumentMode}
+            {reviewDiff}
+            onMarkdownChange={updateMarkdown}
+            onSelectionChange={(selected) => {
+              onSourceSelectionChange(selected);
+              editorGrid?.dispatchEvent(new Event('nomo:source-caret-change'));
+            }}
+            onLayoutChange={() => editorGrid?.dispatchEvent(new Event('nomo:source-layout-change'))}
+            onPaste={handleEditorPaste}
+            onDrop={handleEditorDrop}
+            onReady={handleSourceEditorReady}
+            onScroll={() => {
+              updateActiveOutlineFromSourceScroll();
+              onSourceScroll?.();
+            }}
+          />
         </div>
-        {#if outline.length > 0}
-          <div class="content-outline-list">
-            {#each outline as item, index (item.id)}
-              {#if visibleOutlineIds.has(item.id)}
-                <div
-                  class:active={activeOutlineId === item.id}
-                  class:outline-drag-source={outlineDragging &&
-                    pendingOutlineDrag?.sourceIndex === index}
-                  class:outline-drop-before={outlineDropValid &&
-                    outlineDropTargetIndex === index &&
-                    outlineDropPlacement === 'before'}
-                  class:outline-drop-inside={outlineDropValid &&
-                    outlineDropTargetIndex === index &&
-                    outlineDropPlacement === 'inside'}
-                  class:outline-drop-after={outlineDropValid &&
-                    outlineDropTargetIndex === index &&
-                    outlineDropPlacement === 'after'}
-                  class:outline-drop-invalid={outlineDragging &&
-                    !outlineDropValid &&
-                    outlineDropTargetIndex === index}
-                  class="content-outline-row"
-                  data-outline-index={index}
-                  role="group"
-                  style={`padding-left: ${(item.level - 1) * 16}px`}
-                  transition:outlineRowTransition
-                  on:pointerdown={(event) => handleOutlinePointerDown(event, index)}
-                  on:contextmenu={(event) => handleOutlineItemContextMenu(event, item, index)}
-                >
-                  {#if isOutlineItemExpandable(index)}
+      </section>
+
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
+      <div
+        class="split-divider"
+        class:active={splitResizePointerId !== null}
+        role="separator"
+        aria-label={t.splitDivider()}
+        aria-hidden={mode !== 'split'}
+        aria-orientation="vertical"
+        aria-controls="semantic-editor-pane source-editor-pane"
+        aria-valuemin="25"
+        aria-valuemax="75"
+        aria-valuenow={Math.round(splitLeftPercent)}
+        tabindex={mode === 'split' ? 0 : -1}
+        on:pointerdown={handleSplitResizePointerDown}
+        on:pointermove={handleSplitResizePointerMove}
+        on:pointerup={finishSplitResize}
+        on:pointercancel={finishSplitResize}
+        on:lostpointercapture={finishSplitResize}
+        on:keydown={handleSplitResizeKeydown}
+      ></div>
+
+      {#if mode === 'split' && !largeDocumentMode}
+        <div
+          class="split-alignment-guide"
+          class:visible={splitAlignmentGuideVisible}
+          aria-hidden="true"
+        ></div>
+      {/if}
+
+      <section
+        id="semantic-editor-pane"
+        bind:this={semanticPane}
+        class="semantic-pane"
+        class:split-pane-left={splitViewLayout === 'semantic-source'}
+        class:split-pane-right={splitViewLayout === 'source-semantic'}
+        class:split-pane-active={mode === 'split' && splitActivePane === 'semantic'}
+        aria-label={t.semanticEditorArea()}
+        on:scroll={() => {
+          updateActiveOutlineFromSemanticScroll();
+          onSemanticScroll?.();
+        }}
+        on:paste={handleEditorPaste}
+        on:drop={handleEditorDrop}
+        on:dragover|preventDefault
+        on:contextmenu={handleSemanticContextMenu}
+        on:pointerdown={() => mode === 'split' && setSplitActivePane('semantic')}
+        on:focusin={() => mode === 'split' && setSplitActivePane('semantic')}
+      >
+        <div class="document-layout">
+          {#if frontMatter}
+            <FrontMatterCard
+              {frontMatter}
+              {interfaceLocale}
+              editing={frontMatterEditing}
+              focusRequest={frontMatterFocusRequest}
+              focusTarget={frontMatterFocusTarget}
+              readonly={readonlyDocumentMode}
+              enterEdit={enterFrontMatterEdit}
+              leaveEdit={leaveFrontMatterEdit}
+              updateContent={updateFrontMatterContent}
+              {deleteFrontMatter}
+            />
+          {/if}
+          <div bind:this={editorHost} class="prosemirror-host"></div>
+          <div class="editor-scroll-past-end" data-scroll-past-end aria-hidden="true"></div>
+        </div>
+      </section>
+
+      {#if outlineVisible}
+        <aside
+          bind:this={outlinePanel}
+          class="content-outline"
+          class:outline-dragging={outlineDragging}
+          class:outline-readonly={readonlyDocumentMode}
+          aria-label={t.documentOutline()}
+          transition:outlinePanelTransition
+          on:contextmenu={handleOutlineContextMenu}
+        >
+          <div class="content-outline-header">
+            <strong>{t.documentOutline()}</strong>
+            {#if hasExpandableOutline}
+              <button
+                type="button"
+                class="outline-bulk-toggle"
+                title={hasCollapsedExpandableOutline
+                  ? t.expandAllOutline()
+                  : t.collapseOutlineToDefaultLevel()}
+                aria-label={hasCollapsedExpandableOutline
+                  ? t.expandAllOutline()
+                  : t.collapseOutlineToDefaultLevel()}
+                on:click={toggleAllOutlineItems}
+              >
+                {#if hasCollapsedExpandableOutline}
+                  <ChevronsUpDown size={15} />
+                {:else}
+                  <ChevronsDownUp size={15} />
+                {/if}
+              </button>
+            {/if}
+          </div>
+          {#if outline.length > 0}
+            <div class="content-outline-list">
+              {#each outline as item, index (item.id)}
+                {#if visibleOutlineIds.has(item.id)}
+                  <div
+                    class:active={activeOutlineId === item.id}
+                    class:outline-drag-source={outlineDragging &&
+                      pendingOutlineDrag?.sourceIndex === index}
+                    class:outline-drop-before={outlineDropValid &&
+                      outlineDropTargetIndex === index &&
+                      outlineDropPlacement === 'before'}
+                    class:outline-drop-inside={outlineDropValid &&
+                      outlineDropTargetIndex === index &&
+                      outlineDropPlacement === 'inside'}
+                    class:outline-drop-after={outlineDropValid &&
+                      outlineDropTargetIndex === index &&
+                      outlineDropPlacement === 'after'}
+                    class:outline-drop-invalid={outlineDragging &&
+                      !outlineDropValid &&
+                      outlineDropTargetIndex === index}
+                    class="content-outline-row"
+                    data-outline-index={index}
+                    role="group"
+                    style={`padding-left: ${(item.level - 1) * 16}px`}
+                    transition:outlineRowTransition
+                    on:pointerdown={(event) => handleOutlinePointerDown(event, index)}
+                    on:contextmenu={(event) => handleOutlineItemContextMenu(event, item, index)}
+                  >
+                    {#if isOutlineItemExpandable(index)}
+                      <button
+                        type="button"
+                        class:collapsed={collapsedOutlineIds.has(item.id)}
+                        class="outline-toggle"
+                        title={collapsedOutlineIds.has(item.id)
+                          ? t.expandHeading()
+                          : t.collapseHeading()}
+                        aria-label={collapsedOutlineIds.has(item.id)
+                          ? t.expandNamedHeading({ title: item.title })
+                          : t.collapseNamedHeading({ title: item.title })}
+                        aria-expanded={!collapsedOutlineIds.has(item.id)}
+                        on:click={(event) => handleOutlineToggle(event, item)}
+                      >
+                        <ChevronDown size={13} />
+                      </button>
+                    {:else}
+                      <span class="outline-toggle-placeholder"></span>
+                    {/if}
                     <button
                       type="button"
-                      class:collapsed={collapsedOutlineIds.has(item.id)}
-                      class="outline-toggle"
-                      title={collapsedOutlineIds.has(item.id)
-                        ? t.expandHeading()
-                        : t.collapseHeading()}
-                      aria-label={collapsedOutlineIds.has(item.id)
-                        ? t.expandNamedHeading({ title: item.title })
-                        : t.collapseNamedHeading({ title: item.title })}
-                      aria-expanded={!collapsedOutlineIds.has(item.id)}
-                      on:click={(event) => handleOutlineToggle(event, item)}
+                      class="outline-link"
+                      title={item.title}
+                      on:click={(event) => handleOutlineLinkClick(event, item)}
                     >
-                      <ChevronDown size={13} />
+                      <span>
+                        {#if splitTitleNumber(item.title)[0]}
+                          <span class="outline-num">{splitTitleNumber(item.title)[0]}</span
+                          >{splitTitleNumber(item.title)[1]}
+                        {:else}
+                          {item.title}
+                        {/if}
+                      </span>
                     </button>
-                  {:else}
-                    <span class="outline-toggle-placeholder"></span>
-                  {/if}
-                  <button
-                    type="button"
-                    class="outline-link"
-                    title={item.title}
-                    on:click={(event) => handleOutlineLinkClick(event, item)}
-                  >
-                    <span>
-                      {#if splitTitleNumber(item.title)[0]}
-                        <span class="outline-num">{splitTitleNumber(item.title)[0]}</span
-                        >{splitTitleNumber(item.title)[1]}
-                      {:else}
-                        {item.title}
-                      {/if}
-                    </span>
-                  </button>
-                </div>
-              {/if}
-            {/each}
-          </div>
-        {:else}
-          <p>{t.documentHasNoHeadings()}</p>
-        {/if}
-      </aside>
+                  </div>
+                {/if}
+              {/each}
+            </div>
+          {:else}
+            <p>{t.documentHasNoHeadings()}</p>
+          {/if}
+        </aside>
+      {/if}
+    </div>
+    {#if reviewDiff}
+      <ReviewPanel
+        diff={reviewDiff}
+        {interfaceLocale}
+        baselineCommit={reviewBaselineCommit}
+        repoRoot={reviewRepoRoot}
+        busy={reviewBusy}
+        {selectedChangeId}
+        onAcceptChange={acceptReviewChange}
+        onAcceptAll={acceptAllReview}
+        onReject={rejectReview}
+        onRefresh={refreshReview}
+        onClose={closeReview}
+        onSelectionChange={selectReviewChange}
+      />
     {/if}
-  </div>
-  {#if reviewDiff}
-    <ReviewPanel
-      diff={reviewDiff}
-      {interfaceLocale}
-      baselineCommit={reviewBaselineCommit}
-      repoRoot={reviewRepoRoot}
-      busy={reviewBusy}
-      onAcceptHunk={acceptReviewHunk}
-      onAcceptAll={acceptAllReview}
-      onReject={rejectReview}
-      onRefresh={refreshReview}
-      onClose={closeReview}
-      onSelectionChange={selectReviewHunk}
-    />
-  {/if}
   </div>
 {/key}

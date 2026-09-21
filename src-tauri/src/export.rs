@@ -8,7 +8,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 use tokio::sync::{oneshot, Mutex};
 
 use crate::models::{
-    Base64FileResult, ExportHtmlInput, ExportPdfInput, ExportResult, ReadFileInput,
+    Base64FileResult, ExportFileInput, ExportHtmlInput, ExportPdfInput, ExportResult, ReadFileInput,
 };
 
 const PDF_EXPORT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -38,6 +38,30 @@ pub(crate) async fn export_html(input: ExportHtmlInput) -> Result<ExportResult, 
     Ok(ExportResult {
         file_path: input.file_path,
         bytes_written: input.html_content.len(),
+        warnings: Vec::new(),
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn export_file(input: ExportFileInput) -> Result<ExportResult, String> {
+    let path = Path::new(&input.file_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| format!("创建导出目录失败：{error}"))?;
+    }
+
+    crate::file_system::write_file_atomically(path, &input.bytes)?;
+    crate::app_logger::info(
+        "Export",
+        &format!(
+            "已导出文件：{} ({} bytes)",
+            input.file_path,
+            input.bytes.len()
+        ),
+    );
+
+    Ok(ExportResult {
+        file_path: input.file_path,
+        bytes_written: input.bytes.len(),
         warnings: Vec::new(),
     })
 }
@@ -289,7 +313,7 @@ pub(crate) async fn create_pdf_export_window(
     let ready_tx = Arc::new(StdMutex::new(Some(ready_tx)));
 
     let window = WebviewWindowBuilder::new(app, label, WebviewUrl::External(file_url))
-        .title("Nomo PDF Export")
+        .title("AcaNomo PDF Export")
         .inner_size(1000.0, 1200.0)
         .decorations(false)
         .focused(false)

@@ -40,10 +40,22 @@ function createHandlers(): AppCommandHandlers & { commands: EditorCommand[] } {
     getDefaultDiagramType: vi.fn(() => 'flowchart'),
     exportHtml: vi.fn(),
     exportPdf: vi.fn(),
+    exportDocx: vi.fn(),
+    exportLatex: vi.fn(),
   };
 }
 
 describe('appCommands', () => {
+  it('通过桌面菜单命令导出 Word 和 LaTeX', () => {
+    const handlers = createHandlers();
+
+    executeDesktopCommand('export-docx', handlers);
+    executeDesktopCommand('export-latex', handlers);
+
+    expect(handlers.exportDocx).toHaveBeenCalledTimes(1);
+    expect(handlers.exportLatex).toHaveBeenCalledTimes(1);
+  });
+
   it('通过桌面菜单命令新建窗口', () => {
     const handlers = createHandlers();
 

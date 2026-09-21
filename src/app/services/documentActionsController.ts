@@ -242,7 +242,7 @@ export function createDocumentActionsController(options: DocumentActionsOptions)
     options.setMarkdown(markdownToSave);
     options.setSavedMarkdown(markdownToSave);
     options.setDirty(false);
-    options.getEditor().setDirty(false);
+    syncSavedMarkdownToEditor(markdownToSave);
     const browserSavedTab = options.getTabs().find((tab) => tab.id === options.getActiveTabId());
     if (isMarkdownTab(browserSavedTab)) {
       browserSavedTab.markdown = markdownToSave;
@@ -251,6 +251,19 @@ export function createDocumentActionsController(options: DocumentActionsOptions)
       options.setTabs([...options.getTabs()]);
     }
     return true;
+  }
+
+  function syncSavedMarkdownToEditor(value: string) {
+    const editor = options.getEditor();
+    if (editor.getMarkdown() !== value) {
+      editor.setMarkdown(value, {
+        reason: 'save-file',
+        dirty: false,
+        savedMarkdown: value,
+        preserveHistory: true,
+      });
+    }
+    editor.setDirty(false);
   }
 
   async function openRecentFile(path: string) {
@@ -375,7 +388,7 @@ export function createDocumentActionsController(options: DocumentActionsOptions)
     options.setMarkdown(markdownToSave);
     options.setSavedMarkdown(markdownToSave);
     options.setDirty(false);
-    options.getEditor().setDirty(false);
+    syncSavedMarkdownToEditor(markdownToSave);
     options.setLastKnownModifiedAt(targetTab.lastKnownModifiedAt);
     options.setLargeDocumentMode(targetTab.largeDocumentMode);
     options.setReadonlyDocumentMode(targetTab.readonlyDocumentMode);

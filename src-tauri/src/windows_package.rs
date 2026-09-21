@@ -273,7 +273,7 @@ mod tests {
         let identity = package_identity().unwrap();
         assert_eq!(identity.state, "partnerCenter");
         assert_eq!(identity.name, "7D729C8F.NomoMarkdown");
-        assert_eq!(identity.display_name, "Nomo Markdown");
+        assert_eq!(identity.display_name, "AcaNomo Markdown");
         assert_eq!(
             identity.publisher,
             "CN=B28DFEE9-0867-4248-BB11-F280549EFAB0"

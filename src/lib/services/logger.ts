@@ -1,5 +1,5 @@
 /**
- * Nomo 全局日志工具。
+ * AcaNomo 全局日志工具。
  *
  * 前端日志统一输出到 DevTools，并在 Tauri 环境转发到 Rust，由 Rust 负责终端输出和 ./logs 文件落盘。
  */

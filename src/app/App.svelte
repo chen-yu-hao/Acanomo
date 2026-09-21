@@ -48,10 +48,23 @@
     type EditorSelectionEvent,
     type EditorThemeOptions,
   } from '../lib/editor-core';
-  import { buildAcademicIndex, parseAcademicSettings, parseCitationKeys, upsertAcademicSettings, setAcademicZoteroItems, type AcademicDocumentSettings } from '../lib/editor-core';
-import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markdown';
+  import {
+    buildAcademicIndex,
+    parseAcademicSettings,
+    parseCitationKeys,
+    upsertAcademicSettings,
+    setAcademicZoteroItems,
+    type AcademicDocumentSettings,
+  } from '../lib/editor-core';
+  import { collectMarkdownImageSources, parseMarkdown } from '../lib/editor-core/markdown';
   import { fetchZoteroItems, getCachedZoteroItems } from '../lib/services/zotero';
-  import { buildUnifiedPatch, computeReviewDiff, type ReviewDiff, type ReviewHunk } from '../lib/review/review';
+  import {
+    buildUnifiedPatch,
+    computeReviewDiff,
+    type ReviewChange,
+    type ReviewDiff,
+  } from '../lib/review/review';
+  import { buildReviewSemanticDecorations } from './services/reviewSemanticMapping';
   import {
     analyzeMarkdown,
     calculateDocumentStats,
@@ -88,6 +101,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     getFolderName,
     sameNativePath,
     pathEqualsOrDescendsFrom,
+    resolveDocumentAssetPath,
   } from './utils/pathLabels';
   import {
     executeDesktopCommand as executeDesktopAppCommand,
@@ -111,6 +125,11 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   } from './services/desktopWindow';
   import { routeOpenTarget } from './services/openTargetRouting';
   import { createImageInsertionHandlers } from './services/imageInsertion';
+  import {
+    GoogleTranslateError,
+    translateText,
+    type GoogleTranslationResult,
+  } from './services/googleTranslate';
   import { readEditorClipboard, writeEditorClipboard } from './services/clipboard';
   import { createDesktopImageLoader } from './services/desktopImageLoader';
   import { isOutlineItemVisible as getOutlineItemVisible } from './services/outlineState';
@@ -147,6 +166,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   import ContextMenu from './components/ContextMenu.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AcademicDialog from './components/AcademicDialog.svelte';
+  import TranslationDialog from './components/TranslationDialog.svelte';
   import UnsavedConfirmDialog from './components/UnsavedConfirmDialog.svelte';
   import ExternalChangeDialog from './components/ExternalChangeDialog.svelte';
   import CloseWindowBehaviorDialog from './components/CloseWindowBehaviorDialog.svelte';
@@ -328,19 +348,40 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   let nativePath: string | null = null;
   let statusMessage = '';
   let academicDialogMode: 'citation' | 'settings' | 'label' | 'reference' | null = null;
-  let academicSettings: AcademicDocumentSettings = parseAcademicSettings(extractFrontMatterBlock(markdown)?.raw ?? '');
+  let academicSettings: AcademicDocumentSettings = parseAcademicSettings(
+    extractFrontMatterBlock(markdown)?.raw ?? '',
+  );
   let academicEquationLabels: string[] = [];
   let academicFetchTimer: ReturnType<typeof setTimeout> | undefined;
   let lastAcademicKeys = '';
+  let translationDialogOpen = false;
+  let translationSourceText = '';
+  let translationResult: GoogleTranslationResult | null = null;
+  let translationError = '';
+  let translationBusy = false;
+  let translationRequestId = 0;
   let reviewMode = false;
   let reviewBaseline = '';
   let reviewBaselineCommit = '';
   let reviewRepoRoot = '';
   let reviewRelativePath = '';
   let reviewDiff: ReviewDiff | null = null;
-  let reviewSelectedHunkId = '';
+  let reviewSelectedChangeId = '';
   let reviewBusy = false;
+  let reviewBaselineAssets: string[] = [];
+  // Assets already referenced when a review session starts are not candidates
+  // for destructive cleanup on reject. Git deliberately leaves unrelated
+  // untracked files alone; only resources first seen after review starts may
+  // be removed when they are still untracked.
+  let reviewProtectedAssets = new Set<string>();
+  let reviewSessionAssets = new Map<string, string>();
   let reviewRefreshTimer: number | null = null;
+  let reviewRefreshInFlight = false;
+  // Invalidates asynchronous Git operations when the reviewed document or
+  // session changes before the subprocess returns.
+  let reviewSessionId = 0;
+  let semanticReviewDecorationFrame: number | null = null;
+  let reviewLiveSyncDepth = 0;
   let desktopEnabled = false;
   let recentFiles: RecentEntry[] = [];
   let missingRecentPaths = new Set<string>();
@@ -1416,6 +1457,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     if (mode !== 'split') return;
 
     editor.refreshSemanticView();
+    if (reviewMode) syncSemanticReviewDecorations();
     void tick().then(() => {
       if (mode !== 'split' || generation !== splitSemanticRefreshGeneration) return;
       const editorGrid =
@@ -1518,7 +1560,20 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
 
   // 加载指定 Tab 的状态并更新编辑器
   function loadTabState(tab: Tab) {
-    if (reviewMode) closeReviewMode();
+    // Saving a reviewed document re-enters this loader through
+    // applySavedNativeDocument. Keep the review session for the same native
+    // path; only a real document switch (or Save As) invalidates its Git
+    // baseline.
+    const reviewPathBeforeLoad = nativePath;
+    const preserveReview =
+      reviewMode &&
+      isMarkdownTab(tab) &&
+      Boolean(
+        reviewPathBeforeLoad &&
+        tab.nativePath &&
+        sameNativePath(reviewPathBeforeLoad, tab.nativePath),
+      );
+    if (reviewMode && !preserveReview) closeReviewMode();
     clearSplitSemanticRefreshTimer();
     splitSemanticRefreshGeneration += 1;
     clearReadingPositionSaveTimer();
@@ -1590,6 +1645,12 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
       scheduleReadingPositionRestore(tab, nextReadingMode, storedPosition, restoreGeneration);
     } finally {
       isSwitchingTab = false;
+      if (preserveReview && reviewMode && isMarkdownTab(tab)) {
+        // The loader deliberately suppresses editor events while replacing
+        // the view. Recompute from the newly loaded tab snapshot once it is
+        // stable so source and semantic decorations both recover.
+        updateReviewDiff(editor.getMarkdown());
+      }
     }
   }
 
@@ -2019,7 +2080,8 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
           if (!created) {
             // 接收窗口不再提前显示；创建失败时仍需让用户看到原有错误提示。
             await activateDocumentWindow(desktopEnabled);
-            statusMessage = target.kind === 'folder' ? t.loadFolderTreeFailed() : t.openFileFailed();
+            statusMessage =
+              target.kind === 'folder' ? t.loadFolderTreeFailed() : t.openFileFailed();
           }
         },
         isReusableInitialWindow,
@@ -2419,8 +2481,9 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     change: ExternalFileChangeState,
     segmentedIgnoreTarget?: { sessionId: string; changeToken: string },
   ) {
-    // 有本地补丁时任何自动 reload/overwrite 都可能丢数据，必须回到显式冲突选择。
-    if (change.type !== 'modified' || change.dirtyAtDetection) {
+    // 外部文件是协作场景中的权威版本；即使编辑器有未保存内容，也按偏好静默收口。
+    // 删除没有可追随的磁盘内容，继续交给显式处理流程。
+    if (change.type !== 'modified') {
       return false;
     }
 
@@ -2630,6 +2693,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     try {
       if (nextMode === 'split' && splitActivePane === 'source') {
         editor.refreshSemanticView();
+        if (reviewMode) syncSemanticReviewDecorations();
       }
       const targetCoreMode = nextMode === 'split' ? splitActivePane : getCoreModeForView(nextMode);
       const modeSwitchResult = await editorInteraction.setMode(
@@ -2730,7 +2794,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     insertAcademicBibliography: () => runCommand({ type: 'insertBibliography' }),
     refreshAcademicData: () => void refreshAcademicData(),
     toggleReviewMode: () => void toggleReviewMode(),
-    acceptReviewHunk: () => void acceptSelectedReviewHunk(),
+    acceptReviewHunk: () => void acceptSelectedReviewChange(),
     acceptAllReview: () => void acceptAllReviewChanges(),
     rejectReview: () => void rejectReviewChanges(),
     openSearchPanel: (replaceVisible) => openSearchPanel(replaceVisible),
@@ -2765,17 +2829,24 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     },
     exportHtml: () => handleExport('html'),
     exportPdf: () => handleExport('pdf'),
+    exportDocx: () => handleExport('docx'),
+    exportLatex: () => handleExport('latex'),
   };
   setAcademicZoteroItems(getCachedZoteroItems());
 
   function openAcademicDialog(nextMode: typeof academicDialogMode) {
-    const current = mode === 'source' ? sourceEditor?.getMarkdown() ?? markdown : editor.flushMarkdown();
+    const current =
+      mode === 'source' ? (sourceEditor?.getMarkdown() ?? markdown) : editor.flushMarkdown();
     academicSettings = parseAcademicSettings(extractFrontMatterBlock(current)?.raw ?? '');
-    academicEquationLabels = [...buildAcademicIndex(parseMarkdown(current), academicSettings).equationsByLabel.keys()];
+    academicEquationLabels = [
+      ...buildAcademicIndex(parseMarkdown(current), academicSettings).equationsByLabel.keys(),
+    ];
     academicDialogMode = nextMode;
   }
 
-  function insertAcademicCitation() { openAcademicDialog('citation'); }
+  function insertAcademicCitation() {
+    openAcademicDialog('citation');
+  }
   function applyAcademicCitation(keys: string[]) {
     academicDialogMode = null;
     runCommand({ type: 'insertCitation', keys });
@@ -2787,44 +2858,57 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     runCommand({ type: 'insertBibliography' });
   }
 
-  function insertAcademicEquationReference() { openAcademicDialog('reference'); }
+  function insertAcademicEquationReference() {
+    openAcademicDialog('reference');
+  }
   function applyAcademicEquationReference(label: string) {
     academicDialogMode = null;
     runCommand({ type: 'insertEquationReference', label });
   }
 
-  function addAcademicEquationLabel() { openAcademicDialog('label'); }
+  function addAcademicEquationLabel() {
+    openAcademicDialog('label');
+  }
   function applyAcademicEquationLabel(label: string) {
     academicDialogMode = null;
     runCommand({ type: 'addEquationLabel', label });
   }
 
-  function editAcademicSettings() { openAcademicDialog('settings'); }
+  function editAcademicSettings() {
+    openAcademicDialog('settings');
+  }
   function applyAcademicSettings(next: AcademicDocumentSettings) {
-    const current = mode === 'source' ? sourceEditor?.getMarkdown() ?? markdown : editor.flushMarkdown();
+    const current =
+      mode === 'source' ? (sourceEditor?.getMarkdown() ?? markdown) : editor.flushMarkdown();
     const currentBlock = extractFrontMatterBlock(current);
     const nextFrontMatter = upsertAcademicSettings(currentBlock?.raw ?? '', next);
     const nextMarkdown = currentBlock
       ? `${nextFrontMatter}${current.slice(currentBlock.end)}`
       : `${nextFrontMatter}\n${current}`;
     academicDialogMode = null;
-    if (mode === 'source' && sourceEditor) sourceEditor.setMarkdown(nextMarkdown, { addToHistory: true });
+    if (mode === 'source' && sourceEditor)
+      sourceEditor.setMarkdown(nextMarkdown, { addToHistory: true });
     else editor.setMarkdown(nextMarkdown, { reason: 'programmatic-update' });
     editor.refreshSemanticView();
+    if (reviewMode) syncSemanticReviewDecorations();
   }
 
   async function refreshAcademicData(extraKeys: string[] = []) {
-    const current = mode === 'source' ? sourceEditor?.getMarkdown() ?? markdown : editor.flushMarkdown();
-    const keys = [...new Set([
-      ...extraKeys,
-      ...Array.from(current.matchAll(/\[@([A-Za-z0-9][A-Za-z0-9_-]*)/g), (match) => match[1]),
-      ...Array.from(current.matchAll(/;\s*@([A-Za-z0-9][A-Za-z0-9_-]*)/g), (match) => match[1]),
-    ])];
+    const current =
+      mode === 'source' ? (sourceEditor?.getMarkdown() ?? markdown) : editor.flushMarkdown();
+    const keys = [
+      ...new Set([
+        ...extraKeys,
+        ...Array.from(current.matchAll(/\[@([A-Za-z0-9][A-Za-z0-9_-]*)/g), (match) => match[1]),
+        ...Array.from(current.matchAll(/;\s*@([A-Za-z0-9][A-Za-z0-9_-]*)/g), (match) => match[1]),
+      ]),
+    ];
     if (!keys.length) return;
     try {
       const items = await fetchZoteroItems(keys);
       setAcademicZoteroItems(getCachedZoteroItems());
       editor.refreshSemanticView();
+      if (reviewMode) syncSemanticReviewDecorations();
       statusMessage = `已刷新 ${items.length}/${keys.length} 条文献数据`;
     } catch (error) {
       statusMessage = `Zotero 连接失败：${error instanceof Error ? error.message : String(error)}`;
@@ -2832,38 +2916,60 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   }
 
   function reviewCurrentMarkdown() {
-    if (mode === 'source') return sourceEditor?.getMarkdown() ?? markdown;
-    return editor.flushMarkdown();
+    // EditorCore is the single normalized snapshot used by persistence and
+    // scroll-sync. Source input is pushed into it synchronously before the
+    // change event reaches this component, so reading CodeMirror directly here
+    // can reintroduce a stale/unnormalized TOC value.
+    return editor.getMarkdown();
   }
 
-  function updateReviewDiff() {
+  function updateReviewDiff(currentMarkdown?: string) {
     if (!reviewMode) {
       reviewDiff = null;
+      editor.setReviewDecorations([]);
       return;
     }
-    reviewDiff = computeReviewDiff(reviewBaseline, reviewCurrentMarkdown());
+    const nextMarkdown = currentMarkdown ?? reviewCurrentMarkdown();
+    rememberReviewAssets(collectReviewAssets(nextMarkdown));
+    reviewDiff = computeReviewDiff(reviewBaseline, nextMarkdown);
+    if (!reviewDiff.changes.some((change) => change.id === reviewSelectedChangeId)) {
+      reviewSelectedChangeId = reviewDiff.changes[0]?.id ?? '';
+    }
     syncSemanticReviewDecorations();
   }
 
   function syncSemanticReviewDecorations() {
-    if (!editorHost) return;
-    requestAnimationFrame(() => {
-      const proseMirror = editorHost.querySelector<HTMLElement>('.ProseMirror');
-      if (!proseMirror) return;
-      const blocks = Array.from(proseMirror.children).filter(
-        (node): node is HTMLElement => node instanceof HTMLElement,
-      );
-      blocks.forEach((block) => block.classList.remove('review-semantic-added'));
-      if (!reviewMode || !reviewDiff) return;
-      const mappings = getMarkdownBlockLineMap(reviewCurrentMarkdown());
-      for (const hunk of reviewDiff.hunks) {
-        if (hunk.kind === 'delete') continue;
-        for (const mapping of mappings) {
-          if (mapping.nodeIndex >= blocks.length) continue;
-          if (mapping.toLine < hunk.currentStart || mapping.fromLine > hunk.currentEnd) continue;
-          blocks[mapping.nodeIndex]?.classList.add('review-semantic-added');
-        }
+    if (semanticReviewDecorationFrame !== null) {
+      window.cancelAnimationFrame(semanticReviewDecorationFrame);
+      semanticReviewDecorationFrame = null;
+    }
+    const nextDiff = reviewDiff;
+    const nextReviewMode = reviewMode;
+    semanticReviewDecorationFrame = window.requestAnimationFrame(() => {
+      semanticReviewDecorationFrame = null;
+      if (!nextReviewMode || !nextDiff || !reviewMode || reviewDiff !== nextDiff) {
+        editor.setReviewDecorations([]);
+        return;
       }
+      const snapshot = editor.getScrollSyncSnapshot();
+      // An empty semantic document has no normal block anchors, but the
+      // parser still exposes a real EOF anchor for deletion-only reviews.
+      // Treat that anchor as ready so deleting the whole document remains
+      // visible instead of being discarded by the readiness guard.
+      const hasReviewAnchor =
+        snapshot.ready || snapshot.anchors.some((anchor) => anchor.kind === 'eof');
+      if (!hasReviewAnchor || snapshot.markdown !== nextDiff.current) {
+        // The semantic parser may still be rebuilding. Do not map offsets from
+        // a previous document; the next content-sync/view-refresh will retry.
+        editor.setReviewDecorations([]);
+        return;
+      }
+      const decorations = buildReviewSemanticDecorations(nextDiff, snapshot);
+      if (decorations === null) {
+        editor.setReviewDecorations([]);
+        return;
+      }
+      editor.setReviewDecorations(decorations);
     });
   }
 
@@ -2875,48 +2981,104 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   }
 
   function closeReviewMode() {
+    reviewSessionId += 1;
     clearReviewRefreshTimer();
+    if (semanticReviewDecorationFrame !== null) {
+      window.cancelAnimationFrame(semanticReviewDecorationFrame);
+      semanticReviewDecorationFrame = null;
+    }
     reviewMode = false;
+    editor.setReviewDecorations([]);
     reviewBaseline = '';
     reviewBaselineCommit = '';
     reviewRepoRoot = '';
     reviewRelativePath = '';
     reviewDiff = null;
-    reviewSelectedHunkId = '';
+    reviewSelectedChangeId = '';
+    reviewBaselineAssets = [];
+    reviewProtectedAssets = new Set();
+    reviewSessionAssets = new Map();
   }
 
   function applyGitReviewPayload(payload: GitReviewPayload) {
-    if (payload.baselineContent !== null) reviewBaseline = payload.baselineContent;
+    if (payload.baselineContent !== null) {
+      reviewBaseline = payload.baselineContent;
+      reviewBaselineAssets = collectReviewAssets(payload.baselineContent);
+      for (const path of reviewBaselineAssets) reviewProtectedAssets.add(reviewAssetKey(path));
+      rememberReviewAssets(reviewBaselineAssets);
+    }
     if (payload.baselineCommit) reviewBaselineCommit = payload.baselineCommit;
     if (payload.repoRoot) reviewRepoRoot = payload.repoRoot;
     if (payload.relativePath) reviewRelativePath = payload.relativePath;
     updateReviewDiff();
-    if (!reviewDiff?.hunks.some((hunk) => hunk.id === reviewSelectedHunkId)) {
-      reviewSelectedHunkId = reviewDiff?.hunks[0]?.id ?? '';
+    if (!reviewDiff?.changes.some((change) => change.id === reviewSelectedChangeId)) {
+      reviewSelectedChangeId = reviewDiff?.changes[0]?.id ?? '';
     }
   }
 
   async function toggleReviewMode() {
+    if (reviewBusy) return;
     if (reviewMode) {
       closeReviewMode();
       return;
     }
-    if (!desktopEnabled || !nativePath || !isMarkdownTab(tabs.find((tab) => tab.id === activeTabId))) {
+    if (
+      !desktopEnabled ||
+      !nativePath ||
+      !isMarkdownTab(tabs.find((tab) => tab.id === activeTabId))
+    ) {
       statusMessage = '审阅模式需要一个已保存的 Markdown 文件。';
       return;
     }
-    if (dirty && !(await saveMarkdownFile(false))) return;
+    const startTabId = activeTabId;
+    const startPath = nativePath;
+    const startSessionId = ++reviewSessionId;
     reviewBusy = true;
     try {
-      let payload = await startGitReview(nativePath, false);
+      if (dirty && !(await saveMarkdownFile(false))) return;
+      if (
+        reviewSessionId !== startSessionId ||
+        activeTabId !== startTabId ||
+        !nativePath ||
+        !sameNativePath(nativePath, startPath)
+      )
+        return;
+      // Take this snapshot before the Git baseline is loaded. Existing
+      // untracked assets are part of the user's workspace and must not be
+      // mistaken for files created by this review session.
+      const initialAssets = collectReviewAssets(reviewCurrentMarkdown());
+      reviewProtectedAssets = new Set(initialAssets.map(reviewAssetKey));
+      reviewSessionAssets = new Map();
+      let payload = await startGitReview(startPath, false);
+      if (
+        reviewSessionId !== startSessionId ||
+        activeTabId !== startTabId ||
+        !nativePath ||
+        !sameNativePath(nativePath, startPath)
+      )
+        return;
       if (payload.state === 'requires-init') {
         const createRepo = await confirmAction(
           '当前文件不在 Git 工作区内。是否在当前目录创建 Git 仓库并建立审阅基线？',
           { title: '启用审阅模式', okLabel: '创建仓库', cancelLabel: t.cancel() },
         );
         if (createRepo !== true) return;
-        payload = await startGitReview(nativePath, true);
+        if (
+          reviewSessionId !== startSessionId ||
+          activeTabId !== startTabId ||
+          !nativePath ||
+          !sameNativePath(nativePath, startPath)
+        )
+          return;
+        payload = await startGitReview(startPath, true);
       }
+      if (
+        reviewSessionId !== startSessionId ||
+        activeTabId !== startTabId ||
+        !nativePath ||
+        !sameNativePath(nativePath, startPath)
+      )
+        return;
       if (!payload.baselineCommit || payload.baselineContent === null) {
         throw new Error('无法读取 Git 审阅基线。');
       }
@@ -2932,47 +3094,130 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     }
   }
 
-  async function refreshReviewBaseline() {
-    if (!reviewMode || !nativePath || !reviewBaselineCommit) return;
+  async function refreshReviewBaseline(options: { allowWhileBusy?: boolean } = {}) {
+    if (
+      reviewRefreshInFlight ||
+      (!options.allowWhileBusy && reviewBusy) ||
+      !reviewMode ||
+      !nativePath ||
+      !reviewBaselineCommit
+    )
+      return;
+    reviewRefreshInFlight = true;
+    const refreshPath = nativePath;
+    const refreshCommit = reviewBaselineCommit;
+    const refreshSessionId = reviewSessionId;
     try {
-      const payload = await refreshGitReview(nativePath, reviewBaselineCommit);
-      if (payload.headChanged) {
+      const payload = await refreshGitReview(refreshPath, refreshCommit);
+      if (
+        reviewMode &&
+        reviewSessionId === refreshSessionId &&
+        nativePath &&
+        sameNativePath(nativePath, refreshPath) &&
+        reviewBaselineCommit === refreshCommit &&
+        payload.headChanged
+      ) {
         applyGitReviewPayload(payload);
       }
     } catch (error) {
-      statusMessage = error instanceof Error ? error.message : String(error);
+      if (
+        reviewMode &&
+        reviewSessionId === refreshSessionId &&
+        nativePath &&
+        sameNativePath(nativePath, refreshPath)
+      ) {
+        statusMessage = error instanceof Error ? error.message : String(error);
+      }
+    } finally {
+      reviewRefreshInFlight = false;
     }
   }
 
-  function collectReviewAssets(source: string): string[] {
+  function collectReviewAssets(...sources: string[]): string[] {
     if (!nativePath) return [];
-    const directory = nativePath.slice(0, Math.max(nativePath.lastIndexOf('/'), nativePath.lastIndexOf('\\')));
     const assets: string[] = [];
-    for (const match of source.matchAll(/!\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))/g)) {
-      const raw = (match[1] ?? match[2] ?? '').trim();
-      if (!raw || /^(?:[a-z]+:|\/\/|data:)/i.test(raw)) continue;
-      const path = /^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith('/')
-        ? raw
-        : `${directory}/${raw}`.replace(/\\/g, '/');
-      assets.push(path);
+    for (const source of sources) {
+      for (const raw of collectMarkdownImageSources(source)) {
+        const path = resolveDocumentAssetPath(nativePath, raw);
+        if (path) assets.push(path);
+      }
     }
     return [...new Set(assets)];
   }
 
-  async function acceptReviewHunk(hunk: ReviewHunk | undefined) {
-    if (!reviewMode || !nativePath || !reviewDiff || !hunk) return;
-    if (dirty && !(await saveMarkdownFile(false))) return;
+  function reviewAssetKey(path: string): string {
+    const normalized = path.replace(/\\/g, '/');
+    // Windows paths are case-insensitive; keep Unix paths case-sensitive.
+    return /^[a-zA-Z]:\//.test(normalized) || normalized.startsWith('//')
+      ? normalized.toLowerCase()
+      : normalized;
+  }
+
+  function rememberReviewAssets(paths: string[]) {
+    for (const path of paths) {
+      const normalized = path.trim();
+      if (normalized) reviewSessionAssets.set(reviewAssetKey(normalized), normalized);
+    }
+  }
+
+  function reviewAssetsForReject(currentMarkdown: string): {
+    assets: string[];
+    untrackedAssets: string[];
+  } {
+    const currentAssets = collectReviewAssets(currentMarkdown);
+    rememberReviewAssets(currentAssets);
+    const baselineKeys = new Set(reviewBaselineAssets.map(reviewAssetKey));
+    const assets = [...reviewSessionAssets.values()];
+    const protectedKeys = new Set([...baselineKeys, ...reviewProtectedAssets]);
+    return {
+      assets,
+      // The Rust side checks the index again before deleting each candidate.
+      // This second guard keeps baseline-referenced resources untouched even
+      // when a document changed several times during one review session.
+      untrackedAssets: assets.filter((path) => !protectedKeys.has(reviewAssetKey(path))),
+    };
+  }
+
+  async function acceptReviewChange(change: ReviewChange | undefined) {
+    if (reviewBusy || !reviewMode || !nativePath || !reviewDiff || !change) return;
+    const operationSessionId = reviewSessionId;
+    const operationPath = nativePath;
+    const operationCommit = reviewBaselineCommit;
     reviewBusy = true;
     try {
-      const current = reviewCurrentMarkdown();
-      const patch = buildUnifiedPatch(reviewRelativePath, reviewBaseline, current, hunk);
-      const payload = await acceptGitReviewHunk(
-        nativePath,
-        patch,
-        reviewBaselineCommit,
-        `Markit review: accept change in ${fileName}`,
-        collectReviewAssets(`${hunk.oldLines.join('')}\n${hunk.newLines.join('')}`),
+      const selectedChangeId = change.id;
+      if (!(await saveMarkdownFile(false))) return;
+      if (
+        !reviewMode ||
+        reviewSessionId !== operationSessionId ||
+        !nativePath ||
+        !sameNativePath(nativePath, operationPath) ||
+        reviewBaselineCommit !== operationCommit
+      )
+        return;
+      const savedChange = reviewDiff?.changes.find(
+        (candidate) => candidate.id === selectedChangeId,
       );
+      if (!reviewMode || !savedChange) {
+        throw new Error('保存后所选审阅修改已变化，请重新选择。');
+      }
+      const current = reviewCurrentMarkdown();
+      const patch = buildUnifiedPatch(reviewRelativePath, reviewBaseline, current, savedChange);
+      const payload = await acceptGitReviewHunk(
+        operationPath,
+        patch,
+        operationCommit,
+        `Markit review: accept change in ${fileName}`,
+        collectReviewAssets(`${savedChange.oldLines.join('')}\n${savedChange.newLines.join('')}`),
+      );
+      if (
+        !reviewMode ||
+        reviewSessionId !== operationSessionId ||
+        !nativePath ||
+        !sameNativePath(nativePath, operationPath) ||
+        reviewBaselineCommit !== operationCommit
+      )
+        return;
       applyGitReviewPayload(payload);
       statusMessage = '已接受所选审阅修改';
     } catch (error) {
@@ -2982,29 +3227,74 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     }
   }
 
-  function acceptSelectedReviewHunk() {
-    void acceptReviewHunk(
-      reviewDiff?.hunks.find((hunk) => hunk.id === reviewSelectedHunkId) ?? reviewDiff?.hunks[0],
+  function acceptSelectedReviewChange() {
+    void acceptReviewChange(
+      reviewDiff?.changes.find((change) => change.id === reviewSelectedChangeId) ??
+        reviewDiff?.changes[0],
     );
   }
 
-  function selectReviewHunk(hunk: ReviewHunk) {
-    reviewSelectedHunkId = hunk.id;
+  function selectReviewChange(change: ReviewChange) {
+    reviewSelectedChangeId = change.id;
   }
 
   async function acceptAllReviewChanges() {
-    if (!reviewMode || !nativePath || !reviewDiff?.changed) return;
-    if (dirty && !(await saveMarkdownFile(false))) return;
+    if (reviewBusy || !reviewMode || !nativePath || !reviewDiff?.changed) return;
+    const operationSessionId = reviewSessionId;
+    const operationPath = nativePath;
+    const operationCommit = reviewBaselineCommit;
     reviewBusy = true;
     try {
+      if (!(await saveMarkdownFile(false))) {
+        // Saving is a prerequisite for a Git operation. The save path may
+        // refuse because of an external-file conflict, read-only state, or a
+        // cancelled Save As; make the review action failure explicit instead
+        // of leaving the old status message looking like a successful click.
+        showVisibleError(
+          new Error('当前文档未保存，未接受全部审阅修改。'),
+          '当前文档未保存，未接受全部审阅修改。',
+        );
+        return;
+      }
+      if (
+        !reviewMode ||
+        reviewSessionId !== operationSessionId ||
+        !nativePath ||
+        !sameNativePath(nativePath, operationPath) ||
+        reviewBaselineCommit !== operationCommit
+      )
+        return;
       const payload = await acceptAllGitReview(
-        nativePath,
-        reviewBaselineCommit,
-        collectReviewAssets(`${reviewBaseline}\n${reviewCurrentMarkdown()}`),
+        operationPath,
+        operationCommit,
+        collectReviewAssets(reviewBaseline, reviewCurrentMarkdown()),
         `Markit review: accept all changes in ${fileName}`,
       );
+      if (
+        !reviewMode ||
+        reviewSessionId !== operationSessionId ||
+        !nativePath ||
+        !sameNativePath(nativePath, operationPath) ||
+        reviewBaselineCommit !== operationCommit
+      )
+        return;
       applyGitReviewPayload(payload);
-      statusMessage = '已接受全部审阅修改';
+      if (!payload.committed) {
+        // The editor may have normalized the document while it was being
+        // saved, turning a previously displayed diff into a no-op. Do not
+        // claim success while stale review marks remain visible.
+        if (reviewDiff?.changed) {
+          throw new Error('Git 未检测到可提交的审阅修改，请刷新审阅基线后重试。');
+        }
+        statusMessage = '没有可接受的审阅修改';
+      } else if (reviewDiff?.changed) {
+        // A successful commit should make the current file equal to the new
+        // baseline. Recompute once more before reporting success so an
+        // unexpected asset/index mismatch cannot leave a false green state.
+        throw new Error('接受全部审阅修改后仍存在未提交差异，请刷新审阅基线后重试。');
+      } else {
+        statusMessage = '已接受全部审阅修改';
+      }
     } catch (error) {
       showVisibleError(error, '接受全部审阅修改失败');
     } finally {
@@ -3013,12 +3303,33 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   }
 
   async function rejectReviewChanges() {
-    if (!reviewMode || !nativePath) return;
+    if (reviewBusy || !reviewMode || !nativePath) return;
+    const operationSessionId = reviewSessionId;
+    const operationPath = nativePath;
+    const operationCommit = reviewBaselineCommit;
     reviewBusy = true;
     try {
-      await rejectGitReview(nativePath, collectReviewAssets(`${reviewBaseline}\n${reviewCurrentMarkdown()}`));
-      const restored = await readMarkdownFromPath(nativePath, '读取回滚后的文档失败');
+      const current = reviewCurrentMarkdown();
+      const reviewAssets = reviewAssetsForReject(current);
+      await rejectGitReview(operationPath, reviewAssets.assets, reviewAssets.untrackedAssets);
+      if (
+        !reviewMode ||
+        reviewSessionId !== operationSessionId ||
+        !nativePath ||
+        !sameNativePath(nativePath, operationPath) ||
+        reviewBaselineCommit !== operationCommit
+      )
+        return;
+      const restored = await readMarkdownFromPath(operationPath, '读取回滚后的文档失败');
       if (!restored.document) throw new Error(restored.error);
+      if (
+        !reviewMode ||
+        reviewSessionId !== operationSessionId ||
+        !nativePath ||
+        !sameNativePath(nativePath, operationPath) ||
+        reviewBaselineCommit !== operationCommit
+      )
+        return;
       const next = restored.document.markdown;
       markdown = next;
       savedMarkdown = next;
@@ -3033,9 +3344,13 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
         activeTab.encoding = restored.document.encoding;
         tabs = [...tabs];
       }
-      editor.setMarkdown(next, { reason: 'programmatic-update', dirty: false, savedMarkdown: next });
+      editor.setMarkdown(next, {
+        reason: 'programmatic-update',
+        dirty: false,
+        savedMarkdown: next,
+      });
       sourceEditor?.setMarkdown(next, { addToHistory: false });
-      await refreshReviewBaseline();
+      await refreshReviewBaseline({ allowWhileBusy: true });
       updateReviewDiff();
       statusMessage = '已根据暂存区回滚工作区';
     } catch (error) {
@@ -3062,7 +3377,9 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
       try {
         await fetchZoteroItems(missing);
         setAcademicZoteroItems(getCachedZoteroItems());
-      } catch { /* Existing keys remain visible while Zotero is offline. */ }
+      } catch {
+        /* Existing keys remain visible while Zotero is offline. */
+      }
     }, 300);
   }
 
@@ -3153,11 +3470,11 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
       return buildRenderedBlockContextMenuItems(target);
     }
     return target.kind === 'selection'
-      ? buildSelectionContextMenuItems()
+      ? buildSelectionContextMenuItems(target.text ?? '')
       : buildTextContextMenuItems();
   }
 
-  function buildSelectionContextMenuItems(): ContextMenuItem[] {
+  function buildSelectionContextMenuItems(selectedText: string): ContextMenuItem[] {
     const disabled = readonlyDocumentMode;
     return [
       { label: t.cut(), icon: 'cut', disabled, shortcut: 'Ctrl+X', action: cutSelection },
@@ -3175,6 +3492,12 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
         disabled,
         shortcut: 'Ctrl+Shift+V',
         action: () => pasteFromContextMenu('plain'),
+      },
+      {
+        label: t.translate(),
+        icon: 'translate',
+        disabled: !selectedText.trim(),
+        action: () => translateSelectedText(selectedText),
       },
       menuSeparator(),
       {
@@ -3461,6 +3784,43 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     } catch {
       statusMessage = t.copyFailed();
     }
+  }
+
+  async function translateSelectedText(selectedText: string) {
+    const text = selectedText.trim();
+    if (!text) return;
+    const requestId = ++translationRequestId;
+    translationDialogOpen = true;
+    translationSourceText = text;
+    translationResult = null;
+    translationError = '';
+    translationBusy = true;
+    try {
+      const result = await translateText(text);
+      if (requestId === translationRequestId) translationResult = result;
+    } catch (error) {
+      if (requestId !== translationRequestId) return;
+      translationError =
+        error instanceof GoogleTranslateError && error.code === 'unsupported-language'
+          ? t.translationUnsupported()
+          : t.translationFailed();
+    } finally {
+      if (requestId === translationRequestId) translationBusy = false;
+    }
+  }
+
+  function closeTranslationDialog() {
+    translationRequestId += 1;
+    translationDialogOpen = false;
+    translationBusy = false;
+  }
+
+  function retryTranslation() {
+    if (translationSourceText) void translateSelectedText(translationSourceText);
+  }
+
+  function copyTranslation() {
+    if (translationResult) void copyPlainText(translationResult.translatedText);
   }
 
   async function revealContextPath(path: string) {
@@ -4320,9 +4680,11 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     onExplicitJumpIntent: () => {
       cancelPendingReadingPositionRestore();
       if (mode === 'split') {
-        semanticPane?.closest('.editor-grid')?.dispatchEvent(new CustomEvent('nomo:scroll-sync-navigation', {
-          detail: { pane: getActiveEditorMode() },
-        }));
+        semanticPane?.closest('.editor-grid')?.dispatchEvent(
+          new CustomEvent('nomo:scroll-sync-navigation', {
+            detail: { pane: getActiveEditorMode() },
+          }),
+        );
       }
     },
   });
@@ -5832,6 +6194,10 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     if (linkOpeningTimer !== null) window.clearTimeout(linkOpeningTimer);
     if (softwareUpdateStartupTimer !== null) window.clearTimeout(softwareUpdateStartupTimer);
     clearReviewRefreshTimer();
+    if (semanticReviewDecorationFrame !== null) {
+      window.cancelAnimationFrame(semanticReviewDecorationFrame);
+      semanticReviewDecorationFrame = null;
+    }
     clearSplitSemanticRefreshTimer();
     clearContentAnalysisTimer();
     clearSearchDebounceTimer();
@@ -5848,12 +6214,38 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   function syncFromEditor(event: EditorChangeEvent) {
     if (isSwitchingTab) return;
 
+    // `getMarkdown()` flushes a pending ProseMirror serialization and emits a
+    // nested `content-sync` event. The outer pending event must own the update
+    // so that the nested callback cannot briefly overwrite the live review diff
+    // with an older snapshot.
+    if (reviewLiveSyncDepth > 0 && event.reason === 'content-sync') return;
+
     const activeTab = tabs.find((tab) => tab.id === activeTabId);
     if (!isMarkdownTab(activeTab)) {
       // 隐藏的 Markdown EditorCore 仍可能在主题或布局更新时发事件；分段标签必须彻底忽略。
       return;
     }
-    const markdownChanged = event.markdown !== markdown;
+    const reviewContentEvent =
+      reviewMode && (event.reason === 'content-pending' || event.reason === 'content-sync');
+    // Only the pending event carries the pre-serialization Markdown. A
+    // content-sync event already contains the editor's normalized snapshot;
+    // using reviewCurrentMarkdown() for it can reintroduce a stale CodeMirror
+    // value while source mode is handing content back to ProseMirror.
+    let nextMarkdown = event.markdown;
+    if (reviewMode && event.reason === 'content-pending') {
+      reviewLiveSyncDepth += 1;
+      try {
+        nextMarkdown = reviewCurrentMarkdown();
+      } finally {
+        reviewLiveSyncDepth -= 1;
+      }
+    }
+    if (reviewContentEvent) {
+      // content-pending carries the previous serialized Markdown. Read the
+      // editor/source snapshot once and use it for both the diff and app state.
+      updateReviewDiff(nextMarkdown);
+    }
+    const markdownChanged = nextMarkdown !== markdown;
     if (markdownChanged) {
       selectedStats = null;
     }
@@ -5869,7 +6261,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
       documentActions.cancelPendingAutoSave(activeTab.id);
     }
     if (!dirty && contentStable) {
-      savedMarkdown = event.markdown;
+      savedMarkdown = nextMarkdown;
     }
     version = event.version;
     pendingInlineMarks = event.pendingInlineMarks;
@@ -5877,24 +6269,34 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     activeTab.dirty = dirty;
     activeTab.version = version;
     if (!dirty && contentStable) {
-      activeTab.savedMarkdown = event.markdown;
+      activeTab.savedMarkdown = nextMarkdown;
     }
 
     if (!markdownChanged) {
+      if (
+        reviewMode &&
+        !reviewContentEvent &&
+        (event.reason === 'runtime-options' ||
+          event.reason === 'programmatic-update' ||
+          event.reason === 'restore-snapshot')
+      ) {
+        // Rebuilding the semantic view creates a new ProseMirror state and
+        // clears transient decorations even when the Markdown is unchanged.
+        syncSemanticReviewDecorations();
+      }
       tabs = [...tabs];
       persistWorkspaceState();
       return;
     }
 
-    markdown = event.markdown;
-    if (reviewMode) {
-      reviewDiff = computeReviewDiff(reviewBaseline, event.markdown);
-      syncSemanticReviewDecorations();
+    markdown = nextMarkdown;
+    if (reviewMode && !reviewContentEvent) {
+      updateReviewDiff(nextMarkdown);
     }
     if (event.reason === 'source-input') {
-      scheduleMarkdownAnalysis(event.markdown);
+      scheduleMarkdownAnalysis(nextMarkdown);
     } else {
-      applyMarkdownAnalysis(event.markdown);
+      applyMarkdownAnalysis(nextMarkdown);
     }
 
     activeTab.markdown = markdown;
@@ -5913,7 +6315,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
       return;
     }
 
-    if (event.markdown.length > largeDocumentLimit) {
+    if (nextMarkdown.length > largeDocumentLimit) {
       syncSourceTextareaHeight();
       return;
     }
@@ -6256,7 +6658,7 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     showToast(t.featureComingSoon({ featureName }));
   }
 
-  async function handleExport(format: 'html' | 'pdf') {
+  async function handleExport(format: 'html' | 'pdf' | 'docx' | 'latex') {
     if (isSegmentedTextTab(tabs.find((tab) => tab.id === activeTabId))) {
       // TXT/JSON 不进入 Markdown HTML/PDF 导出链路。
       return;
@@ -6266,43 +6668,53 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
       return;
     }
 
-    const { exportHtml, exportPdf } = await import('./services/exportService');
+    const { exportHtml, exportPdf, exportDocx, exportLatex } =
+      await import('./services/exportService');
     if (editorHost) {
       // 屏幕外图表平时按需换肤，导出快照必须先补齐同一主题。
-      const { MermaidBlockNodeView } = await import(
-        '../lib/editor-core/nodeViews/MermaidBlockNodeView'
-      );
+      const { MermaidBlockNodeView } =
+        await import('../lib/editor-core/nodeViews/MermaidBlockNodeView');
       await MermaidBlockNodeView.flushThemeUpdates(editorHost);
     }
+    // Source mode can leave the semantic ProseMirror view marked dirty until
+    // the next pane switch. Refresh it before taking the HTML snapshot so
+    // Word export sees the same citation/equation nodes as the Markdown.
+    editor.refreshSemanticView();
     const renderedHtml = editorHost?.innerHTML ?? '';
+    const currentMarkdown = editor.getMarkdown();
     const suggestedFileName = fileName.replace(/\.(md|markdown|txt)$/i, '') || 'Untitled';
-
+    const input = {
+      markdown: currentMarkdown,
+      renderedHtml,
+      documentPath: nativePath,
+      suggestedFileName,
+      title: fileName || 'Untitled',
+    };
     const result =
       format === 'html'
-        ? await exportHtml({
-            markdown,
-            renderedHtml,
-            documentPath: nativePath,
-            suggestedFileName,
-            title: fileName || 'Untitled',
-          })
-        : await exportPdf({
-            markdown,
-            renderedHtml,
-            documentPath: nativePath,
-            suggestedFileName,
-            title: fileName || 'Untitled',
-          });
+        ? await exportHtml(input)
+        : format === 'pdf'
+          ? await exportPdf(input)
+          : format === 'docx'
+            ? await exportDocx(input)
+            : await exportLatex(input);
 
     if (result.cancelled) {
       return;
     }
 
     if (result.success) {
+      const exportedPaths = [result.filePath, ...(result.relatedFiles ?? [])]
+        .filter(Boolean)
+        .join(', ');
       const message =
         format === 'html'
-          ? t.exportHtmlSuccess({ path: result.filePath! })
-          : t.exportPdfSuccess({ path: result.filePath! });
+          ? t.exportHtmlSuccess({ path: exportedPaths })
+          : format === 'pdf'
+            ? t.exportPdfSuccess({ path: exportedPaths })
+            : format === 'docx'
+              ? t.exportDocxSuccess({ path: exportedPaths })
+              : t.exportLatexSuccess({ path: exportedPaths });
       const warningText = result.warnings?.filter(Boolean).join('；');
       showToast(warningText ? `${message}；${warningText}` : message, warningText ? 5000 : 2500);
     } else {
@@ -6817,16 +7229,20 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   {editAcademicSettings}
   {insertAcademicBibliography}
   {refreshAcademicData}
+  {reviewMode}
+  toggleReviewMode={() => void toggleReviewMode()}
+  acceptCurrentReview={() => void acceptSelectedReviewChange()}
   {reviewDiff}
-  reviewBaselineCommit={reviewBaselineCommit}
-  reviewRepoRoot={reviewRepoRoot}
-  reviewBusy={reviewBusy}
-  acceptReviewHunk={(hunk: ReviewHunk) => void acceptReviewHunk(hunk)}
+  {reviewBaselineCommit}
+  {reviewRepoRoot}
+  selectedChangeId={reviewSelectedChangeId}
+  {reviewBusy}
+  acceptReviewChange={(change: ReviewChange) => void acceptReviewChange(change)}
   acceptAllReview={() => void acceptAllReviewChanges()}
   rejectReview={() => void rejectReviewChanges()}
   refreshReview={() => void refreshReviewBaseline()}
   closeReview={closeReviewMode}
-  selectReviewHunk={(hunk: ReviewHunk) => selectReviewHunk(hunk)}
+  selectReviewChange={(change: ReviewChange) => selectReviewChange(change)}
   {openSearchPanel}
   {closeSearchPanel}
   {updateSearchQuery}
@@ -6897,6 +7313,8 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
   onZoomChange={handleZoomChange}
   exportHtml={() => handleExport('html')}
   exportPdf={() => handleExport('pdf')}
+  exportDocx={() => handleExport('docx')}
+  exportLatex={() => handleExport('latex')}
   on:createNode={handleCreateNode}
   on:renameNode={handleRenameNode}
   on:refreshFolder={handleRefreshFolder}
@@ -6979,6 +7397,20 @@ import { getMarkdownBlockLineMap, parseMarkdown } from '../lib/editor-core/markd
     onSettings={applyAcademicSettings}
     onLabel={applyAcademicEquationLabel}
     onReference={applyAcademicEquationReference}
+  />
+{/if}
+
+{#if translationDialogOpen}
+  <TranslationDialog
+    open={true}
+    {interfaceLocale}
+    sourceText={translationSourceText}
+    result={translationResult}
+    busy={translationBusy}
+    error={translationError}
+    onClose={closeTranslationDialog}
+    onRetry={retryTranslation}
+    onCopy={copyTranslation}
   />
 {/if}
 

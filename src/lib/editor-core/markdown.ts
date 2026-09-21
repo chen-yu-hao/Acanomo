@@ -28,6 +28,38 @@ import { parseCitationKeys, serializeCitationKeys } from '../academic/academic';
 const markdownIt = MarkdownIt('commonmark', { html: true }).enable(['table', 'strikethrough']);
 markdownIt.validateLink = (url: string) => normalizeLinkHref(url) !== null;
 
+// Markdown-it trims paragraph/heading tails before parsing inline content.
+// Keep those spaces in the editable model: otherwise a live trailing-space
+// edit cannot round-trip, and its source/semantic anchors cease to match.
+// Only restore the tail of the content itself, not closing heading syntax or
+// table-cell padding. Internal Markdown hard-break syntax remains untouched.
+markdownIt.core.ruler.before('inline', 'preserve_textblock_edges', (state) => {
+  const lines = state.src.split('\n');
+  for (const [index, token] of state.tokens.entries()) {
+    if (token.type !== 'inline' || !token.map || !token.content) continue;
+    // Deleting the first word can leave literal spaces before a paragraph.
+    // Restore only top-level paragraph padding already classified as prose;
+    // list/quote indentation, heading syntax and indented code stay structural.
+    const opening = state.tokens[index - 1];
+    if (
+      opening?.type === 'paragraph_open' &&
+      opening.level === 0 &&
+      !/^[\t ]/.test(token.content)
+    ) {
+      const firstLine = lines[token.map[0]] ?? '';
+      const leading = firstLine.match(/^[\t ]+/)?.[0];
+      if (leading && firstLine.slice(leading.length).startsWith(token.content.split('\n')[0])) {
+        token.content = leading + token.content;
+      }
+    }
+    const sourceLine = lines[token.map[1] - 1] ?? '';
+    const whitespace = sourceLine.match(/[\t ]+$/)?.[0];
+    if (!whitespace || /[\t ]$/.test(token.content)) continue;
+    const lastContentLine = token.content.split('\n').at(-1)!;
+    if (sourceLine.trimEnd().endsWith(lastContentLine)) token.content += whitespace;
+  }
+});
+
 markdownIt.inline.ruler.before('link', 'footnote_ref', (state, silent) => {
   const src = state.src;
   const pos = state.pos;
@@ -57,7 +89,8 @@ markdownIt.inline.ruler.before('link', 'citation', (state, silent) => {
   if (end < 0) return false;
   const raw = src.slice(pos + 1, end);
   const keys = parseCitationKeys(raw);
-  if (!keys.length || raw.replace(/@([A-Za-z0-9][A-Za-z0-9_-]*)/g, '').replace(/[;\s]/g, '')) return false;
+  if (!keys.length || raw.replace(/@([A-Za-z0-9][A-Za-z0-9_-]*)/g, '').replace(/[;\s]/g, ''))
+    return false;
   if (!silent) {
     const token = state.push('citation', '', 0);
     token.content = serializeCitationKeys(keys);
@@ -159,7 +192,11 @@ markdownIt.block.ruler.before('reference', 'footnote_def', (state, startLine, _e
 
 /** HTML 属性值转义：& " < > */
 function escapeHtmlAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /** 从 <img ...> 标签内容中提取 src / alt / title / width */
@@ -169,8 +206,12 @@ function parseHtmlImgAttrs(tagContent: string): {
   title: string | null;
   width: string | null;
 } {
-  const result: { src: string | null; alt: string | null; title: string | null; width: string | null } =
-    { src: null, alt: null, title: null, width: null };
+  const result: {
+    src: string | null;
+    alt: string | null;
+    title: string | null;
+    width: string | null;
+  } = { src: null, alt: null, title: null, width: null };
   // 匹配 key="value" | key='value' | key=value（value 不含空白和 >）
   const attrRegex = /([a-zA-Z][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
   let match: RegExpExecArray | null;
@@ -229,7 +270,10 @@ markdownIt.inline.ruler.before('html_inline', 'image_html_inline', (state, silen
   if (end === -1) return false;
 
   // 检查闭合前没有未转义的 <（防止误匹配 <img ...><script>）
-  const tagContent = state.src.slice(pos + 4, end).replace(/\/$/, '').trim();
+  const tagContent = state.src
+    .slice(pos + 4, end)
+    .replace(/\/$/, '')
+    .trim();
   if (tagContent.includes('<')) return false;
 
   const imgAttrs = parseHtmlImgAttrs(tagContent);
@@ -300,18 +344,22 @@ markdownIt.block.ruler.after('fence', 'math_display', (state, startLine, endLine
   return true;
 });
 
-markdownIt.block.ruler.before('reference', 'bibliography_marker', (state, startLine, _endLine, silent) => {
-  const startPos = state.bMarks[startLine] + state.tShift[startLine];
-  const lineText = state.src.slice(startPos, state.eMarks[startLine]).trim();
-  if (lineText !== '<!-- markedown:bibliography -->') return false;
-  if (!silent) {
-    const token = state.push('bibliography_block', 'div', 0);
-    token.content = lineText;
-    token.map = [startLine, startLine + 1];
-  }
-  state.line = startLine + 1;
-  return true;
-});
+markdownIt.block.ruler.before(
+  'reference',
+  'bibliography_marker',
+  (state, startLine, _endLine, silent) => {
+    const startPos = state.bMarks[startLine] + state.tShift[startLine];
+    const lineText = state.src.slice(startPos, state.eMarks[startLine]).trim();
+    if (lineText !== '<!-- markedown:bibliography -->') return false;
+    if (!silent) {
+      const token = state.push('bibliography_block', 'div', 0);
+      token.content = lineText;
+      token.map = [startLine, startLine + 1];
+    }
+    state.line = startLine + 1;
+    return true;
+  },
+);
 
 const parseMarkdownTokens = markdownIt.parse.bind(markdownIt);
 markdownIt.parse = (src, env) => {
@@ -330,7 +378,7 @@ markdownIt.parse = (src, env) => {
     }
   }
 
-  const result = restoreBlankParagraphTokens(normalized);
+  const result = restoreBlankParagraphTokens(restoreWhitespaceParagraphTokens(normalized, src));
 
   // 将匹配 [!TYPE] 的 blockquote 改写为 callout
   transformCalloutTokens(result);
@@ -357,8 +405,14 @@ const tableMarkdownParser = new MarkdownParser(schema, markdownIt, {
   footnote_def: { block: 'footnote_def', getAttrs: (tok: Token) => ({ id: tok.meta?.id ?? '' }) },
   math_inline: { node: 'math_inline', getAttrs: (tok: Token) => ({ tex: tok.content }) },
   math_display: { node: 'math_block', getAttrs: (tok: Token) => ({ tex: tok.content }) },
-  citation: { node: 'citation', getAttrs: (tok: Token) => ({ keys: tok.meta?.keys ?? parseCitationKeys(tok.content) }) },
-  equation_ref: { node: 'equation_ref', getAttrs: (tok: Token) => ({ label: tok.meta?.label ?? tok.content }) },
+  citation: {
+    node: 'citation',
+    getAttrs: (tok: Token) => ({ keys: tok.meta?.keys ?? parseCitationKeys(tok.content) }),
+  },
+  equation_ref: {
+    node: 'equation_ref',
+    getAttrs: (tok: Token) => ({ label: tok.meta?.label ?? tok.content }),
+  },
   bibliography_block: { node: 'bibliography_block' },
   code_inline: { mark: 'code' },
   image: {
@@ -563,7 +617,7 @@ tableMarkdownParserWithHandlers.tokenHandlers.image = (state, tok) => {
 const tableMarkdownSerializer = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.nodes,
-    paragraph(state, node) {
+    paragraph(state, node, parent) {
       const taskParagraph = splitTaskParagraph(node);
       if (taskParagraph) {
         state.write(taskParagraph.marker);
@@ -575,7 +629,29 @@ const tableMarkdownSerializer = new MarkdownSerializer(
         // 空段落只需要触发前一个块落盘；不写入当前列表缩进，避免保存成带空格的“空行”。
         flushPendingClosedBlock(state);
       } else {
-        state.renderInline(node);
+        // Literal spaces at the start of container paragraphs/continuation
+        // lines would be consumed as Markdown indentation on reparse. Encode
+        // only these editable spaces, before emphasis can expel them. The
+        // live document and structural list/quote prefixes stay untouched.
+        let atLineStart = parent.type.name !== 'doc';
+        const children: ProseMirrorNode[] = [];
+        node.forEach((child) => {
+          if (
+            atLineStart &&
+            child.isText &&
+            !child.marks.some((mark) => mark.type === schema.marks.code)
+          ) {
+            const text = child.text!.replace(/^[\t ]+/, (spaces) =>
+              Array.from(spaces, (space) => `&#${space.charCodeAt(0)};`).join(''),
+            );
+            children.push(text === child.text ? child : schema.text(text, child.marks));
+            atLineStart = /^[\t ]+$/.test(child.text!);
+          } else {
+            children.push(child);
+            atLineStart = child.type.name === 'hard_break';
+          }
+        });
+        state.renderInline(node.copy(Fragment.from(children)));
       }
       state.closeBlock(node);
     },
@@ -794,10 +870,15 @@ function preprocessImageHtmlWithProvenance(markdown: string): PreprocessedImageH
     { length: countMarkdownLines(result) },
     (_value, index): MarkdownLineProvenance => {
       const transformedLine = index + 1;
-      const collapsedRange = collapsedRanges.find((range) => range.transformedLine === transformedLine);
-      if (collapsedRange) return { fromLine: collapsedRange.fromLine, toLine: collapsedRange.toLine };
+      const collapsedRange = collapsedRanges.find(
+        (range) => range.transformedLine === transformedLine,
+      );
+      if (collapsedRange)
+        return { fromLine: collapsedRange.fromLine, toLine: collapsedRange.toLine };
       const removedBeforeLine = collapsedRanges.reduce(
-        (total, range) => range.transformedLine < transformedLine ? total + range.toLine - range.fromLine : total, 0,
+        (total, range) =>
+          range.transformedLine < transformedLine ? total + range.toLine - range.fromLine : total,
+        0,
       );
       const originalLine = transformedLine + removedBeforeLine;
       return { fromLine: originalLine, toLine: originalLine };
@@ -807,24 +888,21 @@ function preprocessImageHtmlWithProvenance(markdown: string): PreprocessedImageH
   const standaloneRanges: Array<{ line: number; from: number; to: number }> = [];
   let standaloneRemoved = 0;
   // 步骤2：保留原有图片转换行为，同时记录被空白匹配吞并的行。
-  result = result.replace(
-    /^<img\s+[^>]+(?:\/>|>)\s*$/gim,
-    (imgTag: string, offset: number) => {
-      const cleaned = imgTag.replace(/\/>$/, '').replace(/>$/, '').trim();
-      if (/<[^>]+<[^>]+>/.test(cleaned)) return imgTag; // 含嵌套标签，不处理
-      const attrs = parseHtmlImgAttrs(cleaned);
-      if (!attrs.src) return imgTag;
-      const parts: string[] = [];
-      if (attrs.width) parts.push(`width=${attrs.width}`);
-      const titleStr = attrs.title ? ` "${attrs.title}"` : '';
-      const attrsStr = parts.length > 0 ? `{${parts.join(' ')}}` : '';
-      const from = getLineNumberAtOffset(wrappedMarkdown, offset);
-      const to = getLineNumberAtOffset(wrappedMarkdown, offset + imgTag.length);
-      standaloneRanges.push({ line: from - standaloneRemoved, from, to });
-      standaloneRemoved += to - from;
-      return `![${attrs.alt || ''}](${attrs.src}${titleStr})${attrsStr}`;
-    },
-  );
+  result = result.replace(/^<img\s+[^>]+(?:\/>|>)\s*$/gim, (imgTag: string, offset: number) => {
+    const cleaned = imgTag.replace(/\/>$/, '').replace(/>$/, '').trim();
+    if (/<[^>]+<[^>]+>/.test(cleaned)) return imgTag; // 含嵌套标签，不处理
+    const attrs = parseHtmlImgAttrs(cleaned);
+    if (!attrs.src) return imgTag;
+    const parts: string[] = [];
+    if (attrs.width) parts.push(`width=${attrs.width}`);
+    const titleStr = attrs.title ? ` "${attrs.title}"` : '';
+    const attrsStr = parts.length > 0 ? `{${parts.join(' ')}}` : '';
+    const from = getLineNumberAtOffset(wrappedMarkdown, offset);
+    const to = getLineNumberAtOffset(wrappedMarkdown, offset + imgTag.length);
+    standaloneRanges.push({ line: from - standaloneRemoved, from, to });
+    standaloneRemoved += to - from;
+    return `![${attrs.alt || ''}](${attrs.src}${titleStr})${attrsStr}`;
+  });
 
   let removedBeforeLine = 0;
   let rangeIndex = 0;
@@ -836,8 +914,10 @@ function preprocessImageHtmlWithProvenance(markdown: string): PreprocessedImageH
       if (range?.line === transformedLine) {
         rangeIndex += 1;
         removedBeforeLine += range.to - range.from;
-        return { fromLine: wrappedProvenance[range.from - 1].fromLine,
-          toLine: wrappedProvenance[range.to - 1].toLine };
+        return {
+          fromLine: wrappedProvenance[range.from - 1].fromLine,
+          toLine: wrappedProvenance[range.to - 1].toLine,
+        };
       }
       return wrappedProvenance[index + removedBeforeLine];
     },
@@ -887,6 +967,21 @@ export function parseMarkdown(markdown: string): ProseMirrorNode {
   }
 }
 
+export function collectMarkdownImageSources(markdown: string): string[] {
+  const sources: string[] = [];
+  const seen = new Set<string>();
+  parseMarkdown(markdown).descendants((node) => {
+    if (node.type.name !== 'image') return true;
+    const src = String(node.attrs.src ?? '').trim();
+    if (src && !seen.has(src)) {
+      seen.add(src);
+      sources.push(src);
+    }
+    return false;
+  });
+  return sources;
+}
+
 export interface MarkdownBlockLineMap {
   fromLine: number;
   toLine: number;
@@ -909,7 +1004,11 @@ export function parseMarkdownWithSyncAnchors(markdown: string): {
       return provenance ? (end ? provenance.toLine : provenance.fromLine) + lineOffset : undefined;
     });
     return {
-      doc: result.doc.type.create({ ...result.doc.attrs, frontMatterPrefix }, result.doc.content, result.doc.marks),
+      doc: result.doc.type.create(
+        { ...result.doc.attrs, frontMatterPrefix },
+        result.doc.content,
+        result.doc.marks,
+      ),
       anchors: result.anchors,
     };
   } catch {
@@ -1084,9 +1183,7 @@ function appendPartialTextblock(
     return;
   }
 
-  extraction.nodes.push(
-    schema.nodes.paragraph.create(null, node.content.cut(localFrom, localTo)),
-  );
+  extraction.nodes.push(schema.nodes.paragraph.create(null, node.content.cut(localFrom, localTo)));
 }
 
 function appendPartialList(
@@ -1136,12 +1233,7 @@ function appendPartialList(
   flushSelectedItems();
 }
 
-function selectionIntersectsNode(
-  node: ProseMirrorNode,
-  pos: number,
-  from: number,
-  to: number,
-) {
+function selectionIntersectsNode(node: ProseMirrorNode, pos: number, from: number, to: number) {
   return from < pos + node.nodeSize && to > pos;
 }
 
@@ -1198,6 +1290,35 @@ function splitMarkdownDocument(markdown: string): { frontMatterPrefix: string; b
   const bodyOffset = body ? suffix.indexOf(body) : suffix.length;
   const separator = bodyOffset >= 0 ? suffix.slice(0, bodyOffset) : '';
   return { frontMatterPrefix: `${frontMatter}${separator}`, body };
+}
+
+/** Keep nonempty whitespace-only paragraphs outside parsed blocks editable.
+ * Code, tables and nested blocks already own their source ranges. */
+function restoreWhitespaceParagraphTokens(tokens: Token[], source: string): Token[] {
+  const lines = source.replace(/\r\n?/g, '\n').split('\n');
+  const result: Token[] = [];
+  let previousEnd = 0;
+  function appendWhitespace(until: number) {
+    for (let line = previousEnd; line < until; line += 1) {
+      if (!/^[\t ]+$/.test(lines[line])) continue;
+      const inline = createEmptyInlineToken(line);
+      inline.content = lines[line];
+      const text = new Token('text', '', 0);
+      text.content = lines[line];
+      inline.children = [text];
+      result.push(createEmptyParagraphOpen(line), inline, createEmptyParagraphClose());
+    }
+  }
+  for (const token of tokens) {
+    const range = getTopLevelBlockRange(token);
+    if (range) {
+      appendWhitespace(range[0]);
+      previousEnd = range[1];
+    }
+    result.push(token);
+  }
+  appendWhitespace(lines.length);
+  return result;
 }
 
 function restoreBlankParagraphTokens(tokens: Token[]): Token[] {
@@ -1334,7 +1455,6 @@ function createEmptyInlineToken(line: number): Token {
 function createEmptyParagraphClose(): Token {
   return new Token('paragraph_close', 'p', -1);
 }
-
 
 function createTableMarkdown(rows: number, columns: number): string {
   const columnCount = Math.max(2, Math.min(columns, 6));
@@ -1538,17 +1658,21 @@ export function createMarkdownInputRules() {
 }
 
 function createCitationInputRule(): InputRule {
-  return new InputRule(/\[@[A-Za-z0-9_-]+(?:\s*;\s*@[A-Za-z0-9_-]+)*\]$/, (state, match, start, end) => {
-    const keys = parseCitationKeys(match[0]);
-    const tr = state.tr.replaceWith(start, end, schema.nodes.citation.create({ keys }));
-    let hasBibliography = false;
-    tr.doc.descendants((node) => {
-      if (node.type === schema.nodes.bibliography_block) hasBibliography = true;
-      return !hasBibliography;
-    });
-    if (!hasBibliography) tr.insert(tr.doc.content.size, schema.nodes.bibliography_block.create());
-    return tr;
-  });
+  return new InputRule(
+    /\[@[A-Za-z0-9_-]+(?:\s*;\s*@[A-Za-z0-9_-]+)*\]$/,
+    (state, match, start, end) => {
+      const keys = parseCitationKeys(match[0]);
+      const tr = state.tr.replaceWith(start, end, schema.nodes.citation.create({ keys }));
+      let hasBibliography = false;
+      tr.doc.descendants((node) => {
+        if (node.type === schema.nodes.bibliography_block) hasBibliography = true;
+        return !hasBibliography;
+      });
+      if (!hasBibliography)
+        tr.insert(tr.doc.content.size, schema.nodes.bibliography_block.create());
+      return tr;
+    },
+  );
 }
 
 function createEquationRefInputRule(): InputRule {

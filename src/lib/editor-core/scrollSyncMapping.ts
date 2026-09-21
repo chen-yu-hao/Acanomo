@@ -1,5 +1,5 @@
 import type Token from 'markdown-it/lib/token.mjs';
-import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import { Fragment, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { MarkdownParser } from 'prosemirror-markdown';
 
 /** 只属于当前内容修订的源码位置，不写入文档或撤销历史。 */
@@ -13,6 +13,24 @@ export interface MarkdownSyncAnchor {
   edge: 'start' | 'end' | 'line';
   depth: number;
   lineOffset?: number;
+  /** Visible ProseMirror text used to validate raw Markdown offsets. */
+  textContent?: string;
+  contentSize?: number;
+  /**
+   * Mapping from visible UTF-16 offsets to ProseMirror positions. Atom inline
+   * nodes (citations, equations, images, etc.) occupy a document position but
+   * contribute no `Node.textContent`, so a plain `pos + offset` calculation is
+   * not valid after one of them.
+   */
+  inlineSegments?: readonly MarkdownSyncTextSegment[];
+}
+
+export interface MarkdownSyncTextSegment {
+  textStart: number;
+  textEnd: number;
+  posStart: number;
+  posEnd: number;
+  kind: 'text' | 'atom';
 }
 
 export interface EditorSyncSnapshot {
@@ -43,6 +61,91 @@ interface ParseState {
 }
 type TokenHandler = (state: ParseState, token: Token, tokens: Token[], index: number) => void;
 type ParserWithHandlers = MarkdownParser & { tokenHandlers: Record<string, TokenHandler> };
+
+/** Markdown expels spaces at emphasis boundaries. Ignore only those marks
+ * when comparing sync documents; text, positions and the live doc stay intact. */
+export function withoutMarkdownSpaceMarks(node: ProseMirrorNode): ProseMirrorNode {
+  if (node.isTextblock) {
+    const children: ProseMirrorNode[] = [];
+    node.forEach((child, _pos, index) => {
+      if (!child.isText || !child.marks.length) {
+        children.push(child);
+        return;
+      }
+      const text = child.text!;
+      const head = text.match(/^[\t ]+/)?.[0].length ?? 0;
+      const tail = text.match(/[\t ]+$/)?.[0].length ?? 0;
+      const before = node.maybeChild(index - 1)?.marks ?? [];
+      const after = node.maybeChild(index + 1)?.marks ?? [];
+      const parts =
+        head === text.length
+          ? [[0, text.length]]
+          : [
+              [0, head],
+              [head, text.length - tail],
+              [text.length - tail, text.length],
+            ];
+      for (const [from, to] of parts) {
+        if (to <= from) continue;
+        const marks = child.marks.filter(
+          (mark) =>
+            !['em', 'strong', 'strikethrough', 'underline', 'highlight'].includes(mark.type.name) ||
+            ((from >= head || mark.isInSet(before)) &&
+              (to <= text.length - tail || mark.isInSet(after))),
+        );
+        children.push(node.type.schema.text(text.slice(from, to), marks));
+      }
+    });
+    const content = Fragment.from(children);
+    return content.eq(node.content) ? node : node.copy(content);
+  }
+  if (node.isLeaf) return node;
+  const children: ProseMirrorNode[] = [];
+  let changed = false;
+  node.forEach((child) => {
+    const normalized = withoutMarkdownSpaceMarks(child);
+    children.push(normalized);
+    changed ||= normalized !== child;
+  });
+  return changed ? node.copy(Fragment.from(children)) : node;
+}
+
+function collectInlineSegments(node: ProseMirrorNode, nodePos: number): MarkdownSyncTextSegment[] {
+  const segments: MarkdownSyncTextSegment[] = [];
+  let textOffset = 0;
+
+  const visit = (child: ProseMirrorNode, childPos: number) => {
+    if (child.isText) {
+      const length = child.text?.length ?? 0;
+      segments.push({
+        textStart: textOffset,
+        textEnd: textOffset + length,
+        posStart: childPos,
+        posEnd: childPos + child.nodeSize,
+        kind: 'text',
+      });
+      textOffset += length;
+      return;
+    }
+    // Inline atoms have no textContent but still consume nodeSize positions.
+    // A non-leaf inline container is traversed so marks or custom inline
+    // wrappers remain addressable when a parser extension provides one.
+    if (child.isInline && (child.isLeaf || child.isAtom || child.content.size === 0)) {
+      segments.push({
+        textStart: textOffset,
+        textEnd: textOffset,
+        posStart: childPos,
+        posEnd: childPos + child.nodeSize,
+        kind: 'atom',
+      });
+      return;
+    }
+    child.forEach((grandChild, offset) => visit(grandChild, childPos + 1 + offset));
+  };
+
+  node.forEach((child, offset) => visit(child, nodePos + 1 + offset));
+  return segments;
+}
 
 /**
  * 在现有解析器真正创建节点时记录 token 来源。避免另外按节点数量或文本猜测对应关系；
@@ -116,7 +219,15 @@ export function parseWithSyncAnchors(
     const range = ranges.get(node);
     if (!node.isBlock || !range) return;
     const depth = doc.resolve(pos).depth;
-    const common = { pos, endPos: pos + node.nodeSize, kind: node.type.name, depth };
+    const common = {
+      pos,
+      endPos: pos + node.nodeSize,
+      kind: node.type.name,
+      depth,
+      textContent: node.textContent,
+      contentSize: node.content.size,
+      inlineSegments: collectInlineSegments(node, pos),
+    };
     anchors.push({
       ...common,
       key: `${pos}:start`,

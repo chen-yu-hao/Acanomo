@@ -86,8 +86,8 @@ pub(crate) fn app_text<R: Runtime>(app: &AppHandle<R>, key: &str) -> &'static st
 
 fn zh_cn(key: &str) -> &'static str {
     match key {
-        "settings_window_title" => "偏好设置 - Nomo",
-        "tray_open" => "打开 Nomo",
+        "settings_window_title" => "偏好设置 - AcaNomo",
+        "tray_open" => "打开 AcaNomo",
         "tray_exit" => "退出",
         "menu_file" => "文件(&F)",
         "menu_new" => "新建(&N)",
@@ -102,6 +102,8 @@ fn zh_cn(key: &str) -> &'static str {
         "menu_export" => "导出",
         "menu_export_html" => "导出 HTML",
         "menu_export_pdf" => "导出 PDF",
+        "menu_export_docx" => "导出 Word",
+        "menu_export_latex" => "导出 LaTeX",
         "menu_close_file" => "关闭当前文件",
         "menu_close_window" => "关闭窗口",
         "menu_quit" => "退出(&X)",
@@ -175,19 +177,19 @@ fn zh_cn(key: &str) -> &'static str {
         "menu_chart_gantt" => "甘特图",
         "menu_chart_er" => "ER 图",
         "file_assoc_description" => "轻量 Markdown-first 编辑器",
-        "open_with_nomo" => "用 Nomo 打开",
-        "open_folder_with_nomo" => "用 Nomo 打开文件夹",
-        "md_assoc_registered_default" => ".md 默认打开方式已绑定到 Nomo。",
+        "open_with_nomo" => "用 AcaNomo 打开",
+        "open_folder_with_nomo" => "用 AcaNomo 打开文件夹",
+        "md_assoc_registered_default" => ".md 默认打开方式已绑定到 AcaNomo。",
         "md_assoc_registered_optional" => {
-            "Nomo 已注册为可选 Markdown 应用，请在 Windows 默认应用中选择 Nomo。"
+            "AcaNomo 已注册为可选 Markdown 应用，请在 Windows 默认应用中选择 AcaNomo。"
         }
-        "md_assoc_not_registered" => "尚未注册 Nomo 的 .md 打开方式。",
+        "md_assoc_not_registered" => "尚未注册 AcaNomo 的 .md 打开方式。",
         "md_assoc_registered_message" => {
-            "已注册 Nomo，并打开 Windows 默认应用设置；请选择 Nomo 后这里会显示已绑定。"
+            "已注册 AcaNomo，并打开 Windows 默认应用设置；请选择 AcaNomo 后这里会显示已绑定。"
         }
-        "md_assoc_unregistered_message" => "已取消 Nomo 的 .md 默认打开方式绑定。",
+        "md_assoc_unregistered_message" => "已取消 AcaNomo 的 .md 默认打开方式绑定。",
         "md_assoc_managed_by_package" => {
-            "文件关联由 Microsoft Store 包管理，请在 Windows 默认应用中选择 Nomo。"
+            "文件关联由 Microsoft Store 包管理，请在 Windows 默认应用中选择 AcaNomo。"
         }
         "context_menu_registered" => "已注册 .md 文件和文件夹右键菜单。",
         "context_menu_not_registered" => "尚未注册 .md 文件和文件夹右键菜单。",
@@ -202,8 +204,8 @@ fn zh_cn(key: &str) -> &'static str {
 
 fn zh_tw(key: &str) -> &'static str {
     match key {
-        "settings_window_title" => "偏好設定 - Nomo",
-        "tray_open" => "開啟 Nomo",
+        "settings_window_title" => "偏好設定 - AcaNomo",
+        "tray_open" => "開啟 AcaNomo",
         "tray_exit" => "結束",
         "menu_file" => "檔案(&F)",
         "menu_new" => "新增(&N)",
@@ -218,6 +220,8 @@ fn zh_tw(key: &str) -> &'static str {
         "menu_export" => "匯出",
         "menu_export_html" => "匯出 HTML",
         "menu_export_pdf" => "匯出 PDF",
+        "menu_export_docx" => "匯出 Word",
+        "menu_export_latex" => "匯出 LaTeX",
         "menu_close_file" => "關閉目前檔案",
         "menu_close_window" => "關閉視窗",
         "menu_quit" => "結束(&X)",
@@ -291,19 +295,19 @@ fn zh_tw(key: &str) -> &'static str {
         "menu_chart_gantt" => "甘特圖",
         "menu_chart_er" => "ER 圖",
         "file_assoc_description" => "輕量 Markdown-first 編輯器",
-        "open_with_nomo" => "用 Nomo 開啟",
-        "open_folder_with_nomo" => "用 Nomo 開啟資料夾",
-        "md_assoc_registered_default" => ".md 預設開啟方式已綁定到 Nomo。",
+        "open_with_nomo" => "用 AcaNomo 開啟",
+        "open_folder_with_nomo" => "用 AcaNomo 開啟資料夾",
+        "md_assoc_registered_default" => ".md 預設開啟方式已綁定到 AcaNomo。",
         "md_assoc_registered_optional" => {
-            "Nomo 已註冊為可選 Markdown 應用程式，請在 Windows 預設應用程式中選擇 Nomo。"
+            "AcaNomo 已註冊為可選 Markdown 應用程式，請在 Windows 預設應用程式中選擇 AcaNomo。"
         }
-        "md_assoc_not_registered" => "尚未註冊 Nomo 的 .md 開啟方式。",
+        "md_assoc_not_registered" => "尚未註冊 AcaNomo 的 .md 開啟方式。",
         "md_assoc_registered_message" => {
-            "已註冊 Nomo，並開啟 Windows 預設應用程式設定；請選擇 Nomo 後這裡會顯示已綁定。"
+            "已註冊 AcaNomo，並開啟 Windows 預設應用程式設定；請選擇 AcaNomo 後這裡會顯示已綁定。"
         }
-        "md_assoc_unregistered_message" => "已取消 Nomo 的 .md 預設開啟方式綁定。",
+        "md_assoc_unregistered_message" => "已取消 AcaNomo 的 .md 預設開啟方式綁定。",
         "md_assoc_managed_by_package" => {
-            "檔案關聯由 Microsoft Store 套件管理，請在 Windows 預設應用程式中選擇 Nomo。"
+            "檔案關聯由 Microsoft Store 套件管理，請在 Windows 預設應用程式中選擇 AcaNomo。"
         }
         "context_menu_registered" => "已註冊 .md 檔案和資料夾右鍵選單。",
         "context_menu_not_registered" => "尚未註冊 .md 檔案和資料夾右鍵選單。",
@@ -318,8 +322,8 @@ fn zh_tw(key: &str) -> &'static str {
 
 fn en_us(key: &str) -> &'static str {
     match key {
-        "settings_window_title" => "Preferences - Nomo",
-        "tray_open" => "Open Nomo",
+        "settings_window_title" => "Preferences - AcaNomo",
+        "tray_open" => "Open AcaNomo",
         "tray_exit" => "Quit",
         "menu_file" => "File (&F)",
         "menu_new" => "New (&N)",
@@ -334,6 +338,8 @@ fn en_us(key: &str) -> &'static str {
         "menu_export" => "Export",
         "menu_export_html" => "Export HTML",
         "menu_export_pdf" => "Export PDF",
+        "menu_export_docx" => "Export Word",
+        "menu_export_latex" => "Export LaTeX",
         "menu_close_file" => "Close Current File",
         "menu_close_window" => "Close Window",
         "menu_quit" => "Quit (&X)",
@@ -407,14 +413,14 @@ fn en_us(key: &str) -> &'static str {
         "menu_chart_gantt" => "Gantt Chart",
         "menu_chart_er" => "ER Diagram",
         "file_assoc_description" => "Lightweight Markdown-first editor",
-        "open_with_nomo" => "Open with Nomo",
-        "open_folder_with_nomo" => "Open Folder with Nomo",
-        "md_assoc_registered_default" => ".md default app is bound to Nomo.",
-        "md_assoc_registered_optional" => "Nomo is registered as an optional Markdown app. Choose Nomo in Windows default apps.",
-        "md_assoc_not_registered" => "Nomo is not registered as a .md open-with app yet.",
-        "md_assoc_registered_message" => "Nomo has been registered and Windows default app settings were opened. Choose Nomo there, then this status will show it is bound.",
-        "md_assoc_unregistered_message" => "Nomo .md default app binding has been removed.",
-        "md_assoc_managed_by_package" => "File associations are managed by the Microsoft Store package. Choose Nomo in Windows default apps.",
+        "open_with_nomo" => "Open with AcaNomo",
+        "open_folder_with_nomo" => "Open Folder with AcaNomo",
+        "md_assoc_registered_default" => ".md default app is bound to AcaNomo.",
+        "md_assoc_registered_optional" => "AcaNomo is registered as an optional Markdown app. Choose AcaNomo in Windows default apps.",
+        "md_assoc_not_registered" => "AcaNomo is not registered as a .md open-with app yet.",
+        "md_assoc_registered_message" => "AcaNomo has been registered and Windows default app settings were opened. Choose AcaNomo there, then this status will show it is bound.",
+        "md_assoc_unregistered_message" => "AcaNomo .md default app binding has been removed.",
+        "md_assoc_managed_by_package" => "File associations are managed by the Microsoft Store package. Choose AcaNomo in Windows default apps.",
         "context_menu_registered" => "Registered .md file and folder context menus.",
         "context_menu_not_registered" => ".md file and folder context menus are not registered yet.",
         "context_menu_unregistered_message" => ".md file and folder context menu registration has been removed.",
@@ -428,8 +434,8 @@ fn en_us(key: &str) -> &'static str {
 
 fn ja_jp(key: &str) -> &'static str {
     match key {
-        "settings_window_title" => "環境設定 - Nomo",
-        "tray_open" => "Nomo を開く",
+        "settings_window_title" => "環境設定 - AcaNomo",
+        "tray_open" => "AcaNomo を開く",
         "tray_exit" => "終了",
         "menu_file" => "ファイル(&F)",
         "menu_new" => "新規(&N)",
@@ -444,6 +450,8 @@ fn ja_jp(key: &str) -> &'static str {
         "menu_export" => "エクスポート",
         "menu_export_html" => "HTML をエクスポート",
         "menu_export_pdf" => "PDF をエクスポート",
+        "menu_export_docx" => "Word をエクスポート",
+        "menu_export_latex" => "LaTeX をエクスポート",
         "menu_close_file" => "現在のファイルを閉じる",
         "menu_close_window" => "ウィンドウを閉じる",
         "menu_quit" => "終了(&X)",
@@ -517,14 +525,14 @@ fn ja_jp(key: &str) -> &'static str {
         "menu_chart_gantt" => "ガントチャート",
         "menu_chart_er" => "ER 図",
         "file_assoc_description" => "軽量 Markdown-first エディター",
-        "open_with_nomo" => "Nomo で開く",
-        "open_folder_with_nomo" => "Nomo でフォルダーを開く",
-        "md_assoc_registered_default" => ".md の既定アプリは Nomo に関連付けられています。",
-        "md_assoc_registered_optional" => "Nomo は任意の Markdown アプリとして登録されています。Windows の既定のアプリで Nomo を選択してください。",
-        "md_assoc_not_registered" => "Nomo の .md 開くアプリはまだ登録されていません。",
-        "md_assoc_registered_message" => "Nomo を登録し、Windows の既定のアプリ設定を開きました。そこで Nomo を選択すると、ここに関連付け済みと表示されます。",
-        "md_assoc_unregistered_message" => "Nomo の .md 既定アプリの関連付けを解除しました。",
-        "md_assoc_managed_by_package" => "ファイルの関連付けは Microsoft Store パッケージによって管理されます。Windows の既定のアプリで Nomo を選択してください。",
+        "open_with_nomo" => "AcaNomo で開く",
+        "open_folder_with_nomo" => "AcaNomo でフォルダーを開く",
+        "md_assoc_registered_default" => ".md の既定アプリは AcaNomo に関連付けられています。",
+        "md_assoc_registered_optional" => "AcaNomo は任意の Markdown アプリとして登録されています。Windows の既定のアプリで AcaNomo を選択してください。",
+        "md_assoc_not_registered" => "AcaNomo の .md 開くアプリはまだ登録されていません。",
+        "md_assoc_registered_message" => "AcaNomo を登録し、Windows の既定のアプリ設定を開きました。そこで AcaNomo を選択すると、ここに関連付け済みと表示されます。",
+        "md_assoc_unregistered_message" => "AcaNomo の .md 既定アプリの関連付けを解除しました。",
+        "md_assoc_managed_by_package" => "ファイルの関連付けは Microsoft Store パッケージによって管理されます。Windows の既定のアプリで AcaNomo を選択してください。",
         "context_menu_registered" => ".md ファイルとフォルダーのコンテキストメニューを登録しました。",
         "context_menu_not_registered" => ".md ファイルとフォルダーのコンテキストメニューはまだ登録されていません。",
         "context_menu_unregistered_message" => ".md ファイルとフォルダーのコンテキストメニュー登録を解除しました。",
@@ -586,10 +594,10 @@ mod tests {
 
     #[test]
     fn returns_localized_native_chrome_text() {
-        assert_eq!(text(InterfaceLocale::ZhCn, "tray_open"), "打开 Nomo");
-        assert_eq!(text(InterfaceLocale::ZhTw, "tray_open"), "開啟 Nomo");
-        assert_eq!(text(InterfaceLocale::EnUs, "tray_open"), "Open Nomo");
-        assert_eq!(text(InterfaceLocale::JaJp, "tray_open"), "Nomo を開く");
+        assert_eq!(text(InterfaceLocale::ZhCn, "tray_open"), "打开 AcaNomo");
+        assert_eq!(text(InterfaceLocale::ZhTw, "tray_open"), "開啟 AcaNomo");
+        assert_eq!(text(InterfaceLocale::EnUs, "tray_open"), "Open AcaNomo");
+        assert_eq!(text(InterfaceLocale::JaJp, "tray_open"), "AcaNomo を開く");
 
         assert_eq!(text(InterfaceLocale::ZhCn, "menu_chart_blank"), "空白图表");
         assert_eq!(text(InterfaceLocale::ZhTw, "menu_chart_blank"), "空白圖表");
@@ -604,7 +612,7 @@ mod tests {
         assert_eq!(text(InterfaceLocale::JaJp, "menu_file"), "ファイル(&F)");
         assert_eq!(
             text(InterfaceLocale::JaJp, "settings_window_title"),
-            "環境設定 - Nomo"
+            "環境設定 - AcaNomo"
         );
     }
 }

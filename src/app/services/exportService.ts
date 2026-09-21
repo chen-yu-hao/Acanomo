@@ -1,10 +1,21 @@
 import {
+  exportFile,
   exportHtmlFile,
   exportPdfFromHtml,
   readFileAsBase64,
 } from '../../lib/desktop/tauriStorage';
+import { parseAcademicSettings } from '../../lib/academic/academic';
+import {
+  collectZoteroItemKeys,
+  isZoteroItemKey,
+  sanitizeBibliographyName,
+} from '../../lib/export/latex';
+import { extractFrontMatterBlock } from '../../lib/markdown/frontMatter';
+import { fetchZoteroExportItems } from '../../lib/services/zotero';
 import { logDebug, logInfo, logWarn } from '../../lib/services/logger';
 import exportCssContent from '../styles/export-document.css?inline';
+import { buildAcademicDocx } from './docxExport';
+import { prepareLatexExport } from './latexExportService';
 
 const REMOTE_IMAGE_FETCH_TIMEOUT_MS = 8_000;
 const PDF_OUTLINE_MARKER_HOST = 'nomo-pdf-outline.invalid';
@@ -34,6 +45,7 @@ export interface ExportResult {
   cancelled?: boolean;
   error?: string;
   warnings?: string[];
+  relatedFiles?: string[];
 }
 
 /**
@@ -122,6 +134,126 @@ export async function exportPdf(input: ExportDocumentInput): Promise<ExportResul
     logWarn('exportService', 'PDF 导出失败', { error: message });
     return { success: false, error: message };
   });
+}
+
+/** Export an academic Word document with editable Zotero citation fields. */
+export async function exportDocx(input: ExportDocumentInput): Promise<ExportResult> {
+  return perfAsync('exportService', 'exportDocx', async () => {
+    const defaultName = input.suggestedFileName || 'Untitled';
+    const filePath = await pickSavePath(
+      suggestExportPath(input.documentPath, `${defaultName}.docx`),
+      [{ name: 'Word', extensions: ['docx'] }],
+    );
+    if (!filePath) return { success: false, cancelled: true };
+
+    const settings = parseAcademicSettings(extractFrontMatterBlock(input.markdown)?.raw ?? '');
+    const itemKeys = collectZoteroItemKeys(input.markdown);
+    const exportItems = itemKeys.some(isZoteroItemKey)
+      ? await fetchZoteroExportItems(itemKeys.filter(isZoteroItemKey), settings.citationStyle)
+      : [];
+    const inlinedImages = await inlineLocalImages(
+      cleanEditorArtifacts(input.renderedHtml),
+      input.documentPath,
+    );
+    const document = buildAcademicDocx({
+      renderedHtml: inlinedImages.html,
+      title: input.title,
+      citationStyle: settings.citationStyle,
+      zoteroItems: exportItems.map((item) => ({
+        key: item.key,
+        uri: item.cslItem.id,
+        itemData: item.cslItem,
+        citationHtml: item.citationHtml,
+        bibliographyHtml: item.bibliographyHtml,
+      })),
+    });
+    const result = await exportFile({
+      file_path: filePath,
+      bytes: Array.from(document.bytes),
+    });
+    const warnings = [
+      ...inlinedImages.warnings,
+      ...document.warnings,
+      ...document.citationIssues.map((issue) => issue.message),
+    ];
+    logInfo('exportService', 'Word 导出完成', {
+      filePath,
+      bytes: result.bytes_written,
+      warningCount: warnings.length,
+    });
+    return { success: true, filePath, warnings };
+  }).catch((error) => exportFailure('Word', error));
+}
+
+/** Export a Nature-oriented LaTeX source and its Zotero-derived BibTeX sidecar. */
+export async function exportLatex(input: ExportDocumentInput): Promise<ExportResult> {
+  return perfAsync('exportService', 'exportLatex', async () => {
+    const defaultName = input.suggestedFileName || 'Untitled';
+    const filePath = await pickSavePath(
+      suggestExportPath(input.documentPath, `${defaultName}.tex`),
+      [{ name: 'LaTeX', extensions: ['tex'] }],
+    );
+    if (!filePath) return { success: false, cancelled: true };
+
+    const { directory, stem } = splitExportPath(filePath, '.tex');
+    const bibliographyName = sanitizeBibliographyName(stem);
+    const bibliographyPath = `${directory}${bibliographyName}.bib`;
+    const bundle = await prepareLatexExport({
+      markdown: input.markdown,
+      bibliographyName,
+      sourceDirectory: input.documentPath
+        ? splitExportPath(input.documentPath, '').directory || null
+        : null,
+    });
+    const encoder = new TextEncoder();
+
+    // Write the dependency first so a visible .tex file is never left without its .bib.
+    await exportFile({
+      file_path: bibliographyPath,
+      bytes: Array.from(encoder.encode(bundle.bibContent)),
+    });
+    const result = await exportFile({
+      file_path: filePath,
+      bytes: Array.from(encoder.encode(bundle.texContent)),
+    });
+    logInfo('exportService', 'LaTeX 导出完成', {
+      filePath,
+      bibliographyPath,
+      bytes: result.bytes_written,
+      warningCount: bundle.warnings.length,
+    });
+    return {
+      success: true,
+      filePath,
+      relatedFiles: [bibliographyPath],
+      warnings: bundle.warnings,
+    };
+  }).catch((error) => exportFailure('LaTeX', error));
+}
+
+export function splitExportPath(
+  filePath: string,
+  extension: string,
+): { directory: string; stem: string } {
+  const separatorIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+  const directory = separatorIndex >= 0 ? filePath.slice(0, separatorIndex + 1) : '';
+  const fileName = separatorIndex >= 0 ? filePath.slice(separatorIndex + 1) : filePath;
+  const stem =
+    extension.length > 0 && fileName.toLowerCase().endsWith(extension.toLowerCase())
+      ? fileName.slice(0, -extension.length)
+      : fileName;
+  return { directory, stem: stem || 'Untitled' };
+}
+
+function suggestExportPath(documentPath: string | null, fileName: string): string {
+  if (!documentPath) return fileName;
+  return `${splitExportPath(documentPath, '').directory}${fileName}`;
+}
+
+function exportFailure(format: string, error: unknown): ExportResult {
+  const message = error instanceof Error ? error.message : String(error);
+  logWarn('exportService', `${format} 导出失败`, { error: message });
+  return { success: false, error: message };
 }
 
 /**
@@ -478,7 +610,7 @@ function fileUrlToLocalPath(src: string): string | null {
   // Windows file:///C:/path -> /C:/path -> C:/path
   if (withoutProtocol.startsWith('/')) {
     const path = withoutProtocol.slice(1);
-    if (/^[a-zA-Z]:[\/]/.test(path)) {
+    if (/^[a-zA-Z]:[\\/]/.test(path)) {
       return path;
     }
     // Unix file:///home/user/path -> /home/user/path
@@ -538,7 +670,7 @@ export async function resolveImagePath(
 
 function isAbsoluteLocalPath(src: string): boolean {
   // Windows: C:\path 或 C:/path
-  if (/^[a-zA-Z]:[\/]/.test(src)) {
+  if (/^[a-zA-Z]:[\\/]/.test(src)) {
     return true;
   }
   // Unix: /path
