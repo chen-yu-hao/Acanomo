@@ -48,6 +48,15 @@ const imageNodeSpec = {
   },
 };
 
+const paragraphNodeSpec = {
+  ...markdownSchema.spec.nodes.get('paragraph')!,
+  attrs: {
+    ...(markdownSchema.spec.nodes.get('paragraph')!.attrs ?? {}),
+    /** True only for an HTML block kept as editable fallback text. */
+    htmlFallback: { default: false },
+  },
+};
+
 function readCellAlignment(dom: HTMLElement): TableColumnAlignment | null {
   const value = dom.style.textAlign || dom.getAttribute('data-align');
   return value === 'left' || value === 'center' || value === 'right' ? value : null;
@@ -56,6 +65,7 @@ function readCellAlignment(dom: HTMLElement): TableColumnAlignment | null {
 export const schema = new Schema({
   nodes: markdownSchema.spec.nodes
     .update('doc', docNodeSpec)
+    .update('paragraph', paragraphNodeSpec)
     .update('hard_break', hardBreakNodeSpec)
     .update('image', imageNodeSpec)
     .append(
@@ -112,15 +122,26 @@ export const schema = new Schema({
         },
         toDOM(node) {
           const keys = (node.attrs.keys as string[]).join(';');
-          return ['span', { class: 'citation-node', 'data-citation-keys': keys }, `[@${keys.replace(/;/g, '; @')}]`];
+          return [
+            'span',
+            { class: 'citation-node', 'data-citation-keys': keys },
+            `[@${keys.replace(/;/g, '; @')}]`,
+          ];
         },
-        parseDOM: [{
-          tag: 'span.citation-node',
-          getAttrs(dom) {
-            const value = (dom as HTMLElement).getAttribute('data-citation-keys') ?? '';
-            return { keys: value.split(';').map((key) => key.trim()).filter(Boolean) };
+        parseDOM: [
+          {
+            tag: 'span.citation-node',
+            getAttrs(dom) {
+              const value = (dom as HTMLElement).getAttribute('data-citation-keys') ?? '';
+              return {
+                keys: value
+                  .split(';')
+                  .map((key) => key.trim())
+                  .filter(Boolean),
+              };
+            },
           },
-        }],
+        ],
       },
       equation_ref: {
         inline: true,
@@ -132,14 +153,20 @@ export const schema = new Schema({
           label: { default: '' },
         },
         toDOM(node) {
-          return ['a', { class: 'equation-ref', 'data-equation-label': node.attrs.label }, `\\eqref{${node.attrs.label}}`];
+          return [
+            'a',
+            { class: 'equation-ref', 'data-equation-label': node.attrs.label },
+            `\\eqref{${node.attrs.label}}`,
+          ];
         },
-        parseDOM: [{
-          tag: 'a.equation-ref',
-          getAttrs(dom) {
-            return { label: (dom as HTMLElement).getAttribute('data-equation-label') ?? '' };
+        parseDOM: [
+          {
+            tag: 'a.equation-ref',
+            getAttrs(dom) {
+              return { label: (dom as HTMLElement).getAttribute('data-equation-label') ?? '' };
+            },
           },
-        }],
+        ],
       },
       html_block: {
         content: 'inline*',
@@ -247,7 +274,11 @@ export const schema = new Schema({
             'div',
             { class: 'footnote-def', 'data-footnote-id': id },
             ['span', { class: 'footnote-def-marker' }, id],
-            ['span', { class: 'footnote-def-content', 'data-placeholder': t.footnoteContentPlaceholder() }, 0],
+            [
+              'span',
+              { class: 'footnote-def-content', 'data-placeholder': t.footnoteContentPlaceholder() },
+              0,
+            ],
           ];
         },
         parseDOM: [
@@ -303,7 +334,11 @@ export const schema = new Schema({
         draggable: false,
         group: 'block',
         toDOM() {
-          return ['div', { class: 'bibliography-block', 'data-bibliography-marker': 'true' }, 'References'];
+          return [
+            'div',
+            { class: 'bibliography-block', 'data-bibliography-marker': 'true' },
+            'References',
+          ];
         },
         parseDOM: [{ tag: 'div.bibliography-block' }],
       },
@@ -385,6 +420,18 @@ export const schema = new Schema({
         parseDOM: [{ tag: 'mark' }],
         toDOM() {
           return ['mark', 0];
+        },
+      },
+      superscript: {
+        parseDOM: [{ tag: 'sup' }],
+        toDOM() {
+          return ['sup', 0];
+        },
+      },
+      subscript: {
+        parseDOM: [{ tag: 'sub' }],
+        toDOM() {
+          return ['sub', 0];
         },
       },
     }),

@@ -90,6 +90,20 @@ describe('createEditorCore', () => {
     editor.destroy();
   });
 
+  it('renders HTML superscript affiliations instead of literal tags', () => {
+    const target = document.createElement('div');
+    const editor = createEditorCore({
+      markdown: '*Yuhao Chen<sup>1</sup>,* *Xiao He<sup>1,3,4*</sup>*',
+      target,
+    });
+
+    expect(target.querySelectorAll('.ProseMirror sup')).toHaveLength(2);
+    expect(target.querySelector('.ProseMirror sup')?.textContent).toBe('1');
+    expect(target.querySelector('.ProseMirror')?.textContent).toContain('Yuhao Chen1,');
+    expect(editor.getMarkdown()).not.toContain('\\<sup>');
+    editor.destroy();
+  });
+
   it('copies Markdown by default while retaining rich HTML', () => {
     const target = document.createElement('div');
     const editor = createEditorCore({ markdown: '# 标题\n\n这是 **重点**', target });
@@ -1621,6 +1635,7 @@ describe('createEditorCore', () => {
     '$x^2$',
     '$$\nE = mc^2\n$$',
     '| A | B |\n| --- | --- |\n| 1 | 2 |',
+    '<p>字面段落</p>',
     '<u>下划线</u>',
     '> [!NOTE]\n> 内容',
   ])('preserves plain-pasted Markdown syntax across serialization: %s', (text) => {

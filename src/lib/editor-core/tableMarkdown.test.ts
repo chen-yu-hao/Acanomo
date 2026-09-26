@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseMarkdown, serializeMarkdown } from './markdown';
+import { createEditorCore } from './createEditorCore';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -59,6 +60,7 @@ describe('HTML block round-trip', () => {
     // fallback HTML 作为原始文本保留，不被丢弃
     expect(serialized.length).toBeGreaterThan(0);
     expect(serialized).toContain('<p>fallback paragraph</p>');
+    expect(serialized).not.toContain('\\<p>');
   });
 
   it('preserves script tag HTML as text without executing', () => {
@@ -70,6 +72,18 @@ describe('HTML block round-trip', () => {
     // 但 token content 保留原始文本，序列化后会还原
     expect(serialized.length).toBeGreaterThan(0);
     expect(serialized).toContain('script');
+  });
+
+  it('does not render unsafe protocols from fallback HTML', () => {
+    const target = document.createElement('div');
+    createEditorCore({
+      markdown: '<p><a href="javascript:alert(1)">unsafe</a></p>',
+      target,
+    });
+
+    const widget = target.querySelector('.html-widget');
+    expect(widget?.textContent).toContain('<p><a href="javascript:alert(1)">unsafe</a></p>');
+    expect(widget?.querySelector('a')).toBeNull();
   });
 
   it('round-trips section with link', () => {

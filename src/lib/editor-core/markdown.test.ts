@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { DOMSerializer } from 'prosemirror-model';
 import { inputRules } from 'prosemirror-inputrules';
 import {
   collectMarkdownImageSources,
@@ -160,6 +161,71 @@ describe('markdown serialization', () => {
     });
 
     expect(hasUnderline).toBe(true);
+  });
+
+  it('renders and round-trips superscript author affiliations without escaping HTML', () => {
+    const input = [
+      '# Pushing the accuracy of on-top functionals with agent-driven supervised learning',
+      '',
+      '*Yuhao Chen<sup>1</sup>,* *Dayou Zhang<sup>2</sup>, Donald G. Truhlar<sup>2</sup>, Xiao He<sup>1,3,4*</sup>*',
+      '',
+      '*<sup>1</sup>Shanghai Engineering Research Center of Molecular Therapeutics and New Drug Development, Shanghai, 200062, China;*',
+      '*<sup>2</sup>Department of Chemistry, Chemical Theory Center, University of Minnesota, Minneapolis, MN 55455-0431, USA;*',
+      '',
+      '* To whom correspondence should be addressed: [xiaohe@phy.ecnu.edu.cn](mailto:xiaohe@phy.ecnu.edu.cn) (X.H.)',
+    ].join('\n');
+
+    const parsed = parseMarkdown(input);
+    const superscripts: string[] = [];
+    parsed.descendants((node) => {
+      if (node.isText && node.marks.some((mark) => mark.type === schema.marks.superscript)) {
+        superscripts.push(node.text ?? '');
+      }
+    });
+
+    expect(superscripts).toEqual(['1', '2', '2', '1,3,4*', '1', '2']);
+    const serialized = serializeMarkdown(parsed);
+    expect(serialized).toContain('<sup>1</sup>');
+    expect(serialized).not.toContain('\\<sup>');
+    expect(serialized).not.toContain('\\</sup>');
+    expect(parseMarkdown(serialized).eq(parsed)).toBe(true);
+
+    const rendered = document.createElement('div');
+    rendered.appendChild(DOMSerializer.fromSchema(schema).serializeFragment(parsed.content));
+    expect(rendered.querySelectorAll('sup')).toHaveLength(6);
+    expect(rendered.querySelector('sup')?.textContent).toBe('1');
+  });
+
+  it('supports subscript tags without converting them to literal escaped text', () => {
+    const parsed = parseMarkdown('H<sub>2</sub>O');
+    expect(parsed.textContent).toBe('H2O');
+    expect(parsed.firstChild?.child(1).marks[0]?.type).toBe(schema.marks.subscript);
+    expect(serializeMarkdown(parsed)).toBe('H<sub>2</sub>O');
+  });
+
+  it('keeps the supplied author block renderable and free of escaped HTML', () => {
+    const input = [
+      '# Pushing the accuracy of on-top functional with agent-driven supervised learning',
+      '',
+      '*Yuhao Chen<sup>1</sup>,* *Dayou Zhang<sup>2</sup>, Donald G. Truhlar<sup>2</sup>, Xiao He<sup>1,3,4*</sup>*',
+      '',
+      '*<sup>1</sup>Shanghai Engineering Research Center of Molecular Therapeutics and New Drug Development, Shanghai Frontiers Science Center of Molecule Intelligent Syntheses, School of Chemistry and Molecular Engineering, East China Normal University, Shanghai, 200062, China;*',
+      '',
+      '*<sup>2</sup>Department of Chemistry, Chemical Theory Center, and Minnesota Supercomputing Institute, University of Minnesota, Minneapolis, MN 55455-0431, USA;*',
+      '',
+      '*<sup>3</sup>Anhui Provincial Key Laboratory of Advanced Catalysis and Energy Materials, Anhui Ultra High Molecular Weight Polyethylene Fiber Engineering Research Center, School of Chemistry and Chemical Engineering, Anqing Normal University, Anqing, 261433, China*',
+      '',
+      '*<sup>4</sup>New York University--East China Normal University Center for Computational Chemistry, New York University Shanghai, Shanghai, 200062, China*',
+      '',
+      '* To whom correspondence should be addressed: [xiaohe@phy.ecnu.edu.cn](mailto:xiaohe@phy.ecnu.edu.cn) (X.H.)',
+    ].join('\n');
+
+    const parsed = parseMarkdown(input);
+    const serialized = serializeMarkdown(parsed);
+    expect(parsed.textContent).toContain('Xiao He1,3,4*');
+    expect(serialized).toContain('<sup>1,3,4*</sup>');
+    expect(serialized).not.toMatch(/\\<\/?(?:sup|sub|p)(?:\s|>)/i);
+    expect(parseMarkdown(serialized).eq(parsed)).toBe(true);
   });
 
   it('serializes highlight marks as mark tags', () => {

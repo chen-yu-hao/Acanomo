@@ -7,6 +7,8 @@ export const EDITABLE_BLOCK_TAGS: ReadonlySet<string> = new Set(['section', 'div
 export const EDITABLE_INLINE_TAGS: ReadonlySet<string> = new Set([
   'span',
   'strong',
+  'sup',
+  'sub',
   'em',
   'a',
   'code',
@@ -42,6 +44,8 @@ export const DANGEROUS_TAGS: ReadonlySet<string> = new Set([
 export const INLINE_TAG_TO_MARK: Record<string, string> = {
   strong: 'strong',
   b: 'strong',
+  sup: 'superscript',
+  sub: 'subscript',
   em: 'em',
   i: 'em',
   code: 'code',

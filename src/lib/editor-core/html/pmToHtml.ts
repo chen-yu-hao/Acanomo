@@ -47,6 +47,12 @@ function wrapTextWithMarks(textNode: ProseMirrorNode): string {
       case 'underline':
         text = `<u>${text}</u>`;
         break;
+      case 'superscript':
+        text = `<sup>${text}</sup>`;
+        break;
+      case 'subscript':
+        text = `<sub>${text}</sub>`;
+        break;
       case 'link': {
         const attrs = createLinkAttrs(mark.attrs.href, mark.attrs.title);
         if (!attrs) break;

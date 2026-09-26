@@ -3,7 +3,13 @@ export function escapeHtml(text: string): string {
 }
 
 export function sanitizeHtml(html: string): string {
-  if (/<script\b/i.test(html) || /<iframe\b/i.test(html) || /\bon\w+\s*=/i.test(html)) {
+  if (
+    /<script\b/i.test(html) ||
+    /<iframe\b/i.test(html) ||
+    /\bon\w+\s*=/i.test(html) ||
+    /javascript\s*:/i.test(html) ||
+    /data\s*:\s*text\/html/i.test(html)
+  ) {
     return escapeHtml(html);
   }
   return html;

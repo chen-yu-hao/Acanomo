@@ -495,7 +495,7 @@ tableMarkdownParserWithHandlers.tokenHandlers = {
       state.closeNode();
     } else {
       // 不可编辑 HTML：作为 paragraph 保留原始文本，供 tableHtmlPlugin 渲染 widget
-      state.openNode(schema.nodes.paragraph);
+      state.openNode(schema.nodes.paragraph, { htmlFallback: true });
       state.addText(tok.content.trimEnd());
       state.closeNode();
     }
@@ -510,6 +510,8 @@ tableMarkdownParserWithHandlers.tokenHandlers = {
 const INLINE_MARK_MAP: Record<string, string> = {
   strong: 'strong',
   b: 'strong',
+  sup: 'superscript',
+  sub: 'subscript',
   em: 'em',
   i: 'em',
   code: 'code',
@@ -760,7 +762,10 @@ const tableMarkdownSerializer = new MarkdownSerializer(
       state.closeBlock(node);
     },
     text(state, node, parent) {
-      let escaped = escapeMarkdownTextWithoutManualInlineMarkers(node.text ?? '');
+      let escaped = escapeMarkdownTextWithoutManualInlineMarkers(
+        node.text ?? '',
+        isFallbackHtmlParagraph(parent),
+      );
       if (containsLiteralDisplayMathSyntax(parent)) {
         escaped = escaped.replace(/(?<!\\)\$/g, '\\$');
       }
@@ -804,6 +809,16 @@ const tableMarkdownSerializer = new MarkdownSerializer(
       close: '</mark>',
       mixable: true,
       expelEnclosingWhitespace: true,
+    },
+    superscript: {
+      open: '<sup>',
+      close: '</sup>',
+      mixable: true,
+    },
+    subscript: {
+      open: '<sub>',
+      close: '</sub>',
+      mixable: true,
     },
     link: {
       open: '[',
@@ -923,7 +938,21 @@ function preprocessImageHtmlWithProvenance(markdown: string): PreprocessedImageH
     },
   );
 
-  return { markdown: result, lineProvenance };
+  return { markdown: protectSuperscriptLiteralAsterisks(result), lineProvenance };
+}
+
+/**
+ * Markdown-it's emphasis scanner runs before our HTML mark handler and can
+ * consume a literal `*` inside `<sup>...</sup>`.  Protect those characters
+ * as entities so author affiliation markers survive parsing as superscript
+ * text instead of becoming an unmatched emphasis delimiter.
+ */
+function protectSuperscriptLiteralAsterisks(markdown: string): string {
+  return markdown.replace(
+    /(<sup\b[^>]*>)([^<]*?)(<\/sup>)/gi,
+    (_match, open: string, content: string, close: string) =>
+      `${open}${content.replace(/(?<!\\)\*/g, '&#42;')}${close}`,
+  );
 }
 
 function preprocessImageHtml(markdown: string): string {
@@ -1550,6 +1579,8 @@ function serializeInlineText(node: ProseMirrorNode): string {
     if (mark.type.name === 'strikethrough') return `~~${value}~~`;
     if (mark.type.name === 'underline') return `<u>${value}</u>`;
     if (mark.type.name === 'highlight') return `<mark>${value}</mark>`;
+    if (mark.type.name === 'superscript') return `<sup>${value}</sup>`;
+    if (mark.type.name === 'subscript') return `<sub>${value}</sub>`;
     if (mark.type.name === 'link') {
       const href = serializeMarkdownLinkDestination(String(mark.attrs.href ?? ''));
       const title = mark.attrs.title
@@ -1587,7 +1618,10 @@ function escapeTableText(text: string): string {
   return text.replace(/\\/g, '\\\\');
 }
 
-function escapeMarkdownTextWithoutManualInlineMarkers(text: string): string {
+function escapeMarkdownTextWithoutManualInlineMarkers(
+  text: string,
+  preserveSafeHtml = false,
+): string {
   let escaped = text.replace(/[`\\[\]|_]/g, (match, index) =>
     match === '_' &&
     index > 0 &&
@@ -1607,9 +1641,68 @@ function escapeMarkdownTextWithoutManualInlineMarkers(text: string): string {
   if (/\$\$(?:[\s\S]*?\S)?\$\$|\$(?!\$)(?=\S)[^\n]*?\S\$(?!\$)/.test(escaped)) {
     escaped = escaped.replace(/(?<!\\)\$/g, '\\$');
   }
-  escaped = escaped.replace(/(?<!\\)<(?=\/?[A-Za-z][^>]*>)/g, '\\<');
-  return escaped;
+  return escaped.replace(
+    /(?<!\\)<(\/?)([A-Za-z][A-Za-z0-9]*)(?=[\s>])[^>]*>/g,
+    (tagText, closing: string, tagName: string) =>
+      preserveSafeHtml && SAFE_LITERAL_HTML_TAGS.has(tagName.toLowerCase())
+        ? tagText
+        : `\\${tagText}`,
+  );
 }
+
+function isFallbackHtmlParagraph(parent: ProseMirrorNode): boolean {
+  return parent.type === schema.nodes.paragraph && parent.attrs.htmlFallback === true;
+}
+
+// Fallback HTML is stored as editable text. Preserve harmless wrappers such
+// as <p> when saving it, while keeping executable or unknown tags escaped.
+const SAFE_LITERAL_HTML_TAGS = new Set([
+  // Inline tags accepted by the HTML policy or commonly used in fallback
+  // blocks such as README badges and aligned paragraphs.
+  'a',
+  'abbr',
+  'b',
+  'blockquote',
+  'br',
+  'code',
+  'del',
+  'div',
+  'em',
+  'figcaption',
+  'figure',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hr',
+  'i',
+  'img',
+  'kbd',
+  'li',
+  'mark',
+  'ol',
+  'p',
+  'pre',
+  'q',
+  's',
+  'section',
+  'small',
+  'span',
+  'strong',
+  'sub',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'tr',
+  'u',
+  'ul',
+]);
 
 function escapeMarkdownBlockStart(text: string): string {
   return text.replace(
