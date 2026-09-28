@@ -1,6 +1,6 @@
 {
   "name": "nomo",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "license": "AGPL-3.0-or-later",
   "private": true,
   "packageManager": "pnpm@11.5.1",
@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "pnpm exec paraglide-js compile && vite --host 0.0.0.0",
     "build": "pnpm exec paraglide-js compile && vite build",
-    "build:quicklook-renderer": "vite build --config vite.quicklook.config.ts",
+    "build:quicklook-renderer": "pnpm exec paraglide-js compile && vite build --config vite.quicklook.config.ts",
     "build:quicklook-extension": "bash scripts/build-macos-quicklook.sh",
     "build:macos": "pnpm run build:quicklook-extension && bash scripts/compile-macos-appicon.sh && APPLE_SIGNING_IDENTITY=${APPLE_SIGNING_IDENTITY:--} tauri build --bundles app,dmg && bash scripts/verify-macos-bundle.sh",
     "preview": "vite preview --host 0.0.0.0",
