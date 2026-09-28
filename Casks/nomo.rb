@@ -1,6 +1,6 @@
 cask "nomo" do
-  version "0.5.2"
-  sha256 "4b0b5737f9528fdb56bfe86d7e9bef2cb92da2ef485dc87d73070dd7dbd9cd48"
+  version "0.5.9"
+  sha256 "002d4042ca95313a7bd11463cd1aae963bd78c1008e93da006b18ea26225c620"
 
   url "https://github.com/chen-yu-hao/Acanomo/releases/download/v#{version}/AcaNomo_#{version}_aarch64.dmg"
   name "AcaNomo"
