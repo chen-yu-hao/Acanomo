@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">AcaNomo 0.5.7 feature overview</title>
+  <desc id="desc">A workflow illustration for academic writing, Git review mode, and Nature or ACS export presets.</desc>
+  <defs>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eff6ff"/>
+      <stop offset="1" stop-color="#f5f3ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <style>
+      .title { font: 700 42px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 20px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #475569; }
+      .card-title { font: 700 25px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #0f172a; }
+      .card-subtitle { font: 400 16px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #64748b; }
+      .label { font: 600 15px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #334155; }
+      .body { font: 400 16px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #1e293b; }
+      .small { font: 400 14px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #64748b; }
+      .mono { font: 400 15px 'Cascadia Code', Consolas, monospace; fill: #334155; }
+      .mono-small { font: 400 13px 'Cascadia Code', Consolas, monospace; fill: #475569; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" rx="32" fill="#f8fafc"/>
+  <rect x="32" y="32" width="1536" height="150" rx="24" fill="url(#header)"/>
+  <circle cx="92" cy="104" r="35" fill="#0f172a"/>
+  <text x="92" y="118" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="37" font-weight="700" fill="#ffffff">N</text>
+  <text x="150" y="94" class="title">AcaNomo 0.5.7</text>
+  <text x="150" y="130" class="subtitle">Academic writing · Git review · Journal-oriented export</text>
+  <text x="1530" y="82" text-anchor="end" class="small">Workflow illustration</text>
+  <text x="1530" y="108" text-anchor="end" class="small">See README for current limits</text>
+
+  <g transform="translate(52 214)" filter="url(#shadow)">
+    <rect width="480" height="650" rx="22" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+    <rect width="480" height="10" rx="5" fill="#2563eb"/>
+    <text x="32" y="58" class="card-title">学术写作</text>
+    <text x="32" y="86" class="card-subtitle">公式编号、交叉引用与 Zotero</text>
+
+    <rect x="28" y="116" width="424" height="184" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="48" y="146" class="label">Markdown</text>
+    <text x="48" y="175" class="mono">equation-numbering: section</text>
+    <text x="48" y="201" class="mono">citation-style: numeric</text>
+    <text x="48" y="236" class="mono">$$ E = mc^2 \label{eq:energy} $$</text>
+    <text x="48" y="270" class="mono">[@D9PGQUM4; @T4IQZGRM]</text>
+
+    <path d="M240 318 v30" stroke="#94a3b8" stroke-width="2"/>
+    <path d="m232 340 8 10 8-10" fill="none" stroke="#94a3b8" stroke-width="2"/>
+    <rect x="28" y="366" width="424" height="152" rx="14" fill="#eff6ff" stroke="#bfdbfe"/>
+    <text x="48" y="398" class="label">语义结果</text>
+    <text x="48" y="436" class="body">E = mc²</text>
+    <text x="390" y="436" text-anchor="end" class="label" fill="#2563eb">(1.1)</text>
+    <text x="48" y="472" class="body">引用显示为 [1, 2]</text>
+    <text x="48" y="500" class="small">标签可跳转；参考文献按占位符定位</text>
+
+    <rect x="28" y="548" width="424" height="66" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+    <circle cx="54" cy="581" r="13" fill="#7c3aed"/>
+    <text x="54" y="586" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Z</text>
+    <text x="78" y="577" class="label">Zotero 本地连接</text>
+    <text x="78" y="600" class="small">127.0.0.1:23119/api</text>
+  </g>
+
+  <g transform="translate(560 214)" filter="url(#shadow)">
+    <rect width="480" height="650" rx="22" fill="#ffffff" stroke="#fee2e2" stroke-width="2"/>
+    <rect width="480" height="10" rx="5" fill="#dc2626"/>
+    <text x="32" y="58" class="card-title">Git 审阅模式</text>
+    <text x="32" y="86" class="card-subtitle">以 HEAD 为基线的可接受修改</text>
+
+    <rect x="28" y="116" width="424" height="70" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="48" y="146" class="label">审阅基线</text>
+    <rect x="48" y="157" width="84" height="22" rx="11" fill="#e2e8f0"/>
+    <text x="90" y="173" text-anchor="middle" class="small">Git HEAD</text>
+    <text x="150" y="173" class="small">→ 当前编辑器内容</text>
+
+    <rect x="28" y="212" width="424" height="232" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="48" y="244" class="label">Unified diff · 3 行上下文</text>
+    <text x="48" y="280" class="body">方法保持稳定。</text>
+    <text x="48" y="318" class="body" text-decoration="line-through" text-decoration-color="#dc2626">− 旧的实验条件</text>
+    <line x1="48" y1="322" x2="184" y2="322" stroke="#dc2626" stroke-width="2"/>
+    <text x="48" y="356" class="body">+ 新的实验条件</text>
+    <line x1="48" y1="360" x2="184" y2="360" stroke="#2563eb" stroke-width="2"/>
+    <text x="48" y="402" class="small">新增：蓝色下划线　删除：红色删除线</text>
+    <text x="48" y="426" class="small">临时标记不会写入 Markdown</text>
+
+    <path d="M240 462 v28" stroke="#94a3b8" stroke-width="2"/>
+    <path d="m232 482 8 10 8-10" fill="none" stroke="#94a3b8" stroke-width="2"/>
+    <rect x="28" y="506" width="424" height="108" rx="14" fill="#fff7ed" stroke="#fed7aa"/>
+    <text x="48" y="538" class="label">审阅操作</text>
+    <rect x="48" y="554" width="112" height="34" rx="9" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="104" y="576" text-anchor="middle" class="small">接受当前</text>
+    <rect x="172" y="554" width="112" height="34" rx="9" fill="#2563eb"/>
+    <text x="228" y="576" text-anchor="middle" class="small" fill="#ffffff">接受全部</text>
+    <rect x="296" y="554" width="112" height="34" rx="9" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="352" y="576" text-anchor="middle" class="small">从暂存区回滚</text>
+  </g>
+
+  <g transform="translate(1068 214)" filter="url(#shadow)">
+    <rect width="480" height="650" rx="22" fill="#ffffff" stroke="#ede9fe" stroke-width="2"/>
+    <rect width="480" height="10" rx="5" fill="#7c3aed"/>
+    <text x="32" y="58" class="card-title">期刊导出版式</text>
+    <text x="32" y="86" class="card-subtitle">导出 LaTeX 或 Word 前选择预设</text>
+
+    <rect x="28" y="116" width="424" height="56" rx="12" fill="#f5f3ff" stroke="#ddd6fe"/>
+    <text x="48" y="151" class="label">选择导出版式</text>
+    <text x="410" y="151" text-anchor="end" class="small">LaTeX · Word</text>
+
+    <rect x="28" y="198" width="424" height="118" rx="14" fill="#ffffff" stroke="#c4b5fd" stroke-width="2"/>
+    <circle cx="56" cy="230" r="12" fill="#7c3aed"/>
+    <circle cx="56" cy="230" r="5" fill="#ffffff"/>
+    <text x="84" y="235" class="card-title" font-size="20">Nature 系列</text>
+    <text x="48" y="270" class="small">article 结构 · Nature 参考文献样式</text>
+    <text x="48" y="294" class="small">Times New Roman · 适合作为投稿初稿</text>
+
+    <rect x="28" y="338" width="424" height="118" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <circle cx="56" cy="370" r="12" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+    <text x="84" y="375" class="card-title" font-size="20">ACS 系列</text>
+    <text x="48" y="410" class="small">LaTeX 优先使用 achemso；Word 使用 ACS 样式</text>
+    <text x="48" y="434" class="small">缺少 achemso 时回退到可编译 article 结构</text>
+
+    <rect x="28" y="490" width="424" height="124" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="48" y="523" class="label">导出前检查</text>
+    <text x="48" y="555" class="body">✓ 图片与 Zotero 字段</text>
+    <text x="48" y="581" class="body">✓ 公式、引用和参考文献</text>
+    <text x="48" y="607" class="small">预设是起点，仍请以期刊最新指南为准</text>
+  </g>
+
+  <text x="800" y="928" text-anchor="middle" class="small">图示为功能流程说明，不是应用截图；颜色会随浅色 / 深色主题微调。</text>
+</svg>

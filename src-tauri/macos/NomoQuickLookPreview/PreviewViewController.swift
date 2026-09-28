@@ -1,8 +1,8 @@
 import Cocoa
 import Darwin
 import OSLog
-import QuickLookUI
-import WebKit
+@preconcurrency import QuickLookUI
+@preconcurrency import WebKit
 
 private let appearanceLogger = Logger(
     subsystem: "com.nomo.desktop.quicklook",

@@ -47,10 +47,15 @@ esac
 
 # Xcode 的 App Extension target 会自动把入口设为 _NSExtensionMain；
 # 直接调用 swiftc 时必须显式设置，否则生成的进程会启动后立即退出，导致 PlugInKit XPC Code=4097。
+# Keep the hand-built extension on the Swift 5 language mode. The Quick Look
+# protocol is imported from an SDK whose concurrency annotations vary between
+# Xcode releases; Swift 6 otherwise turns the existing actor-isolation
+# compatibility warning into a hard error before the app can be bundled.
 xcrun swiftc \
   "$EXTENSION_SRC_DIR/PreviewViewController.swift" \
   -emit-executable \
   -parse-as-library \
+  -swift-version 5 \
   -module-name NomoQuickLookPreview \
   -application-extension \
   -target "${SWIFT_TARGET_ARCH}-apple-macosx12.0" \
