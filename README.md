@@ -26,7 +26,7 @@
 
 AcaNomo 是一款本地优先、Markdown-first 的桌面编辑器，支持 macOS 与 Windows。它以 Markdown 文本作为文档主数据，在语义编辑与源码模式之间保持一致，同时提供面向论文写作的公式、引用与审阅工作流，以及 TXT、JSON 大文件分段编辑、文件管理、文档导航和桌面集成能力。
 
-本文描述当前 `main` 分支的功能；已发布安装包的具体能力与变更，请以对应的 [GitHub Release](https://github.com/chen-yu-hao/Acanomo/releases) 说明为准。当前 `v0.5.7` 修复 macOS Quick Look 构建并恢复 arm64 `.dmg` 发布。
+本文描述当前 `main` 分支的功能；已发布安装包的具体能力与变更，请以对应的 [GitHub Release](https://github.com/chen-yu-hao/Acanomo/releases) 说明为准。当前 `v0.5.8` 继续修复 macOS Quick Look 构建并恢复 arm64 `.dmg` 发布。
 
 <p align="center">
   <img src="./assets/demo_image.gif" alt="AcaNomo 基础工作流演示" width="960">
@@ -34,7 +34,7 @@ AcaNomo 是一款本地优先、Markdown-first 的桌面编辑器，支持 macOS
 <p align="center"><sub>基础工作流 GIF（功能流程示意）：语义编辑、Zotero 引用、Git 审阅和 Nature/ACS 导出。</sub></p>
 
 <p align="center">
-  <img src="./assets/feature-overview.svg" alt="AcaNomo 0.5.7 学术写作、Git 审阅和 Nature/ACS 导出工作流" width="960">
+  <img src="./assets/feature-overview.svg" alt="AcaNomo 0.5.8 学术写作、Git 审阅和 Nature/ACS 导出工作流" width="960">
 </p>
 
 ## 下载与安装
@@ -57,7 +57,7 @@ brew install --cask nomo
 
 Release 页面若附带 `checksums.md5`，可用于核对下载文件完整性。
 
-`v0.5.7` 当前提供 Windows x64 NSIS 安装包、免安装 ZIP 和 macOS arm64 `.dmg`；其他资源请以对应 Release 的实际资产为准。
+`v0.5.8` 当前提供 Windows x64 NSIS 安装包、免安装 ZIP 和 macOS arm64 `.dmg`；其他资源请以对应 Release 的实际资产为准。
 
 当前 GitHub Release 构建未配置 Windows 发行者代码签名或 Apple 公证，首次打开时可能出现 SmartScreen / Gatekeeper 提示。请只从本项目 Release 下载，并在需要时使用校验清单核对文件。
 

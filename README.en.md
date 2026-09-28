@@ -26,7 +26,7 @@
 
 AcaNomo is a local-first, Markdown-first desktop editor for macOS and Windows. Markdown text remains the source of truth while semantic editing and source mode stay in sync. It also provides academic formula, citation, and review workflows, segmented editing for large TXT and JSON files, file management, document navigation, and desktop integration.
 
-This README tracks the current `main` branch. For the exact capabilities and changes included in an installer, see its matching [GitHub Release](https://github.com/chen-yu-hao/Acanomo/releases). `v0.5.7` fixes the macOS Quick Look build and restores the arm64 `.dmg` release asset.
+This README tracks the current `main` branch. For the exact capabilities and changes included in an installer, see its matching [GitHub Release](https://github.com/chen-yu-hao/Acanomo/releases). `v0.5.8` continues fixing the macOS Quick Look build and restores the arm64 `.dmg` release asset.
 
 <p align="center">
   <img src="./assets/demo_image.gif" alt="AcaNomo basic workflow demo" width="960">
@@ -34,7 +34,7 @@ This README tracks the current `main` branch. For the exact capabilities and cha
 <p align="center"><sub>Basic workflow GIF (illustrated UI): semantic editing, Zotero citations, Git review, and Nature/ACS export.</sub></p>
 
 <p align="center">
-  <img src="./assets/feature-overview.svg" alt="AcaNomo 0.5.7 academic writing, Git review, and Nature/ACS export workflows" width="960">
+  <img src="./assets/feature-overview.svg" alt="AcaNomo 0.5.8 academic writing, Git review, and Nature/ACS export workflows" width="960">
 </p>
 
 ## Download and Installation
@@ -57,7 +57,7 @@ If it is already installed, run `brew upgrade --cask nomo`.
 
 When a release provides `checksums.md5`, use it to verify download integrity.
 
-The current `v0.5.7` release provides Windows x64 NSIS and portable ZIP packages plus a macOS arm64 `.dmg`; check the release's actual assets for any additional formats.
+The current `v0.5.8` release provides Windows x64 NSIS and portable ZIP packages plus a macOS arm64 `.dmg`; check the release's actual assets for any additional formats.
 
 Current GitHub Release builds do not use a Windows publisher code signature or Apple notarization, so SmartScreen or Gatekeeper may prompt on first launch. Download only from this project's Releases and verify files against the checksum list when needed.
 

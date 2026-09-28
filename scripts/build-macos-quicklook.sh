@@ -16,8 +16,24 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 PNPM_BIN="${PNPM_BIN:-pnpm}"
 
+report_build_failure() {
+  local label="$1"
+  local log_file="$2"
+  local summary
+  summary="$(tail -n 40 "$log_file" | tr '\r\n' ' ')"
+  echo "::error title=$label::$summary"
+}
+
 cd "$ROOT_DIR"
-"$PNPM_BIN" run build:quicklook-renderer
+RENDERER_LOG="$(mktemp)"
+set +e
+"$PNPM_BIN" run build:quicklook-renderer 2>&1 | tee "$RENDERER_LOG"
+RENDERER_STATUS="${PIPESTATUS[0]}"
+set -e
+if [[ "$RENDERER_STATUS" != "0" ]]; then
+  report_build_failure "Build Quick Look renderer" "$RENDERER_LOG"
+  exit "$RENDERER_STATUS"
+fi
 
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -47,10 +63,15 @@ esac
 
 # Xcode 的 App Extension target 会自动把入口设为 _NSExtensionMain；
 # 直接调用 swiftc 时必须显式设置，否则生成的进程会启动后立即退出，导致 PlugInKit XPC Code=4097。
+ENTITLEMENTS="$EXTENSION_SRC_DIR/NomoQuickLookPreview.entitlements"
+# Tauri 使用 APPLE_SIGNING_IDENTITY；保留旧变量作为显式扩展签名覆盖，并确保嵌套扩展与主 App 同身份。
+CODESIGN_IDENTITY="${APPLE_CODESIGN_IDENTITY:-${APPLE_SIGNING_IDENTITY:--}}"
 # Keep the hand-built extension on the Swift 5 language mode. The Quick Look
 # protocol is imported from an SDK whose concurrency annotations vary between
 # Xcode releases; Swift 6 otherwise turns the existing actor-isolation
 # compatibility warning into a hard error before the app can be bundled.
+SWIFTC_LOG="$(mktemp)"
+set +e
 xcrun swiftc \
   "$EXTENSION_SRC_DIR/PreviewViewController.swift" \
   -emit-executable \
@@ -69,11 +90,15 @@ xcrun swiftc \
   -framework Cocoa \
   -framework QuickLook \
   -framework QuickLookUI \
-  -framework WebKit
+  -framework WebKit >"$SWIFTC_LOG" 2>&1
+SWIFTC_STATUS="$?"
+set -e
+if [[ "$SWIFTC_STATUS" != "0" ]]; then
+  cat "$SWIFTC_LOG" >&2
+  report_build_failure "Compile Quick Look extension" "$SWIFTC_LOG"
+  exit "$SWIFTC_STATUS"
+fi
 
-ENTITLEMENTS="$EXTENSION_SRC_DIR/NomoQuickLookPreview.entitlements"
-# Tauri 使用 APPLE_SIGNING_IDENTITY；保留旧变量作为显式扩展签名覆盖，并确保嵌套扩展与主 App 同身份。
-CODESIGN_IDENTITY="${APPLE_CODESIGN_IDENTITY:-${APPLE_SIGNING_IDENTITY:--}}"
 /usr/bin/codesign \
   --force \
   --sign "$CODESIGN_IDENTITY" \
