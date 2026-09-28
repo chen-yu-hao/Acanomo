@@ -62,6 +62,24 @@ describe('LaTeX export', () => {
     ]);
   });
 
+  it('renders the ACS preset with a portable achemso fallback', () => {
+    const result = buildLatexExport({
+      markdown: 'A cited result [@D9PGQUM4].',
+      template: 'acs',
+      zoteroEntries: entries,
+    });
+
+    expect(result.texContent).toContain('\\IfFileExists{achemso.cls}');
+    expect(result.texContent).toContain(
+      '\\documentclass[journal=jacsat,manuscript=article]{achemso}',
+    );
+    expect(result.texContent).toContain('\\IfFileExists{achemso.bst}');
+    expect(result.texContent).toContain('\\bibliographystyle{achemso}');
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining('ACS LaTeX 模板')]),
+    );
+  });
+
   it('places the bibliography exactly at the movable marker', () => {
     const result = buildLatexExport({
       markdown: [

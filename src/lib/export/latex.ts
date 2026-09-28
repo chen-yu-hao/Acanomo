@@ -2,6 +2,7 @@ import type { Mark, Node as ProseMirrorNode } from 'prosemirror-model';
 import { parseAcademicSettings, type CitationStyle } from '../academic/academic';
 import { parseMarkdown } from '../editor-core/markdown';
 import { extractFrontMatterBlock } from '../markdown/frontMatter';
+import type { ExportTemplateId } from './exportTemplates';
 
 export interface ZoteroBibtexEntry {
   /** Zotero's stable, eight-character item key. */
@@ -19,6 +20,8 @@ export interface LatexExportOptions {
   /** Absolute directory containing the source Markdown document. */
   sourceDirectory?: string | null;
   zoteroEntries?: readonly ZoteroBibtexEntry[];
+  /** Journal-oriented preamble and bibliography preset. */
+  template?: ExportTemplateId;
 }
 
 export interface LatexExportBundle {
@@ -40,6 +43,7 @@ interface RenderContext {
   sourceDirectory: string | null;
   unresolvedItemKeys: Set<string>;
   warnings: string[];
+  template: ExportTemplateId;
 }
 
 const ZOTERO_ITEM_KEY_RE = /^[A-Z0-9]{8}$/;
@@ -72,6 +76,7 @@ export function buildLatexExport(options: LatexExportOptions): LatexExportBundle
   const doc = parseMarkdown(options.markdown);
   const frontMatter = extractFrontMatterBlock(options.markdown);
   const citationStyle = parseAcademicSettings(frontMatter?.raw ?? '').citationStyle;
+  const template = options.template ?? 'nature';
   const bibliographyName = sanitizeBibliographyName(options.bibliographyName ?? 'references');
   const itemKeys = collectCitationKeys(doc);
   const warnings: string[] = [];
@@ -116,13 +121,14 @@ export function buildLatexExport(options: LatexExportOptions): LatexExportBundle
     sourceDirectory: options.sourceDirectory?.trim() || null,
     unresolvedItemKeys,
     warnings,
+    template,
   };
   const body = renderBlocks(doc, context).trim();
   const bibliography = context.bibliographyRendered ? '' : `\n\n${renderBibliography(context)}`;
   const title = options.title?.trim() || frontMatter?.fields.title || 'Untitled Manuscript';
   const author = options.author?.trim() ?? '';
   const containsCjk = /[\u3400-\u9fff\uf900-\ufaff]/u.test(`${title}\n${author}\n${body}`);
-  const texContent = `${renderPreamble(title, author, citationStyle, containsCjk)}\n${body}${bibliography}\n\n\\end{document}\n`;
+  const texContent = `${renderPreamble(title, author, citationStyle, containsCjk, template)}\n${body}${bibliography}\n\n\\end{document}\n`;
 
   for (const key of unresolvedItemKeys) {
     if (!isZoteroItemKey(key)) {
@@ -210,13 +216,25 @@ function renderPreamble(
   author: string,
   citationStyle: CitationStyle,
   containsCjk: boolean,
+  template: ExportTemplateId,
 ): string {
   const natbibOptions =
     citationStyle === 'author-year' ? 'authoryear,round' : 'numbers,super,sort&compress';
+  const isAcs = template === 'acs';
+  const documentClass = isAcs
+    ? '\\IfFileExists{achemso.cls}{\\documentclass[journal=jacsat,manuscript=article]{achemso}}{\\documentclass[12pt,a4paper]{article}}'
+    : '\\documentclass[12pt,a4paper]{article}';
+  const templateComment = isAcs
+    ? '% ACS preset: use achemso when installed; otherwise keep a portable article fallback.\n'
+    : '% Nature preset: portable article manuscript layout with Nature-compatible bibliography fallback.\n';
+  const geometry = isAcs
+    ? '\\IfFileExists{achemso.cls}{}{\\usepackage[a4paper,top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}}'
+    : '\\usepackage[a4paper,top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}';
+  const natbib = `\\IfFileExists{achemso.cls}{}{\\usepackage[${natbibOptions}]{natbib}}`;
   const optionalCjk = containsCjk
     ? '\n% Prefer XeLaTeX or LuaLaTeX for CJK manuscripts.\n\\IfFileExists{ctex.sty}{\\usepackage[UTF8,scheme=plain]{ctex}}{}'
     : '';
-  return `\\documentclass[12pt,a4paper]{article}
+  return `${templateComment}${documentClass}
 \\usepackage{iftex}
 \\ifPDFTeX
   \\usepackage[T1]{fontenc}
@@ -230,14 +248,14 @@ function renderPreamble(
     \\IfFontExistsTF{TeX Gyre Termes Math}{\\setmathfont{TeX Gyre Termes Math}}{}
   }{}
 \\fi${optionalCjk}
-\\usepackage[a4paper,top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+${geometry}
 \\usepackage{amsmath,amssymb}
 \\usepackage{graphicx}
 \\usepackage{booktabs,tabularx,array}
 \\usepackage[normalem]{ulem}
 \\usepackage{xcolor}
 \\usepackage{float}
-\\usepackage[${natbibOptions}]{natbib}
+${natbib}
 \\usepackage[hidelinks]{hyperref}
 \\usepackage{xurl}
 \\IfFileExists{microtype.sty}{\\usepackage{microtype}}{}
@@ -567,6 +585,14 @@ function renderVerbatim(content: string, context: RenderContext): string {
 }
 
 function renderBibliography(context: RenderContext): string {
+  if (context.template === 'acs') {
+    const warning =
+      'ACS LaTeX 模板优先使用 achemso.bst；未安装时将回退为 unsrtnat（请安装 achemso 以获得目标期刊格式）。';
+    if (!context.warnings.includes(warning)) context.warnings.push(warning);
+    const style =
+      '\\IfFileExists{achemso.bst}{\\bibliographystyle{achemso}}{\\bibliographystyle{unsrtnat}}';
+    return `${style}\n\\bibliography{${context.bibliographyName}}`;
+  }
   if (context.citationStyle === 'author-year') {
     return `\\bibliographystyle{plainnat}\n\\bibliography{${context.bibliographyName}}`;
   }

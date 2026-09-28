@@ -205,6 +205,37 @@ describe('academic DOCX export', () => {
     expect(preference('delayCitationUpdates')).toBe('false');
   });
 
+  it('applies the ACS page, typography, and Zotero style preset', () => {
+    const result = buildAcademicDocx({
+      template: 'acs',
+      title: 'ACS layout',
+      sessionId: 'NOMOTEST',
+      zoteroItems: [gagliardi],
+      citationStyle: 'numeric',
+      renderedHtml:
+        '<p>Result <span class="citation-node" data-citation-keys="D9PGQUM4">[1]</span></p>',
+    });
+    const entries = readStoredZip(result.bytes);
+    const document = text(entries, 'word/document.xml');
+    const styles = text(entries, 'word/styles.xml');
+    const preferences = new DOMParser().parseFromString(
+      text(entries, 'docProps/custom.xml'),
+      'application/xml',
+    );
+
+    expect(document).toContain('<w:pgSz w:w="12240" w:h="15840"/>');
+    expect(document).toContain('<w:pgMar w:top="1440" w:right="1440" w:bottom="1440"');
+    expect(styles).toContain('w:ascii="Arial"');
+    expect(styles).toContain('w:line="360"');
+    expect(text(entries, 'word/fontTable.xml')).toContain('w:name="Arial"');
+    expect(
+      [...preferences.getElementsByTagName('*')].some((node) =>
+        (node.textContent ?? '').includes('american-chemical-society'),
+      ),
+    ).toBe(true);
+    expect(text(entries, 'docProps/app.xml')).toContain('<AppVersion>0.5.6</AppVersion>');
+  });
+
   it('embeds supported base64 images with DrawingML, relationships and media content types', () => {
     const fixtures = [
       {

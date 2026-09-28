@@ -1,12 +1,58 @@
+import type { ExportTemplateId } from '../../lib/export/exportTemplates';
+
 const WORD_NAMESPACE = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const CSL_CITATION_SCHEMA =
   'https://github.com/citation-style-language/schema/raw/master/csl-citation.json';
 const NATURE_STYLE_ID = 'http://www.zotero.org/styles/nature';
+const ACS_STYLE_ID = 'http://www.zotero.org/styles/american-chemical-society';
 const APA_STYLE_ID = 'http://www.zotero.org/styles/apa';
 const FIELD_CHUNK_SIZE = 240;
 const EMU_PER_PIXEL = 9_525;
 const MAX_IMAGE_WIDTH_EMU = 5_731_510;
 const MAX_IMAGE_HEIGHT_EMU = 8_000_000;
+
+interface WordTemplateConfig {
+  fontFamily: string;
+  paperWidth: number;
+  paperHeight: number;
+  margin: number;
+  headerMargin: number;
+  footerMargin: number;
+  lineSpacing: number;
+  titleSize: number;
+  headingSize: number;
+  headingOneBefore: number;
+  headingBefore: number;
+}
+
+const WORD_TEMPLATE_CONFIGS: Record<ExportTemplateId, WordTemplateConfig> = {
+  nature: {
+    fontFamily: 'Times New Roman',
+    paperWidth: 11906,
+    paperHeight: 16838,
+    margin: 1440,
+    headerMargin: 720,
+    footerMargin: 720,
+    lineSpacing: 480,
+    titleSize: 24,
+    headingSize: 24,
+    headingOneBefore: 360,
+    headingBefore: 240,
+  },
+  acs: {
+    fontFamily: 'Arial',
+    paperWidth: 12240,
+    paperHeight: 15840,
+    margin: 1440,
+    headerMargin: 720,
+    footerMargin: 720,
+    lineSpacing: 360,
+    titleSize: 28,
+    headingSize: 24,
+    headingOneBefore: 300,
+    headingBefore: 180,
+  },
+};
 
 export interface ZoteroWordExportItem {
   key: string;
@@ -43,6 +89,8 @@ export interface AcademicDocxInput {
   locale?: string;
   zoteroVersion?: string;
   citationStyle?: 'numeric' | 'author-year';
+  /** Journal-oriented page, typography, and Zotero style preset. */
+  template?: ExportTemplateId;
 }
 
 export interface AcademicDocxBuildResult {
@@ -126,6 +174,8 @@ export function buildAcademicDocx(input: AcademicDocxInput): AcademicDocxBuildRe
   const citationIssues: DocxCitationIssue[] = [];
   const items = validateItems(input.zoteroItems, citationIssues);
   const citationNumbers = collectCitationNumbers(htmlDocument.body);
+  const template = input.template ?? 'nature';
+  const layout = WORD_TEMPLATE_CONFIGS[template];
   const context: BuildContext = {
     items,
     citationNumbers,
@@ -152,6 +202,7 @@ export function buildAcademicDocx(input: AcademicDocxInput): AcademicDocxBuildRe
   // refreshable in Word.
   const documentPreferences = zoteroPreferencesXml({
     citationStyle: context.citationStyle,
+    template,
     locale: input.locale ?? 'en-US',
     // A bibliography placeholder is itself a Zotero bibliography field, even
     // when the document currently has no resolved citation items. When no
@@ -169,11 +220,11 @@ export function buildAcademicDocx(input: AcademicDocxInput): AcademicDocxBuildRe
     textEntry('docProps/core.xml', corePropertiesXml(input.title)),
     textEntry('docProps/app.xml', appPropertiesXml()),
     textEntry('docProps/custom.xml', customPropertiesXml(documentPreferences)),
-    textEntry('word/document.xml', documentXml(body.join(''))),
-    textEntry('word/styles.xml', stylesXml()),
+    textEntry('word/document.xml', documentXml(body.join(''), layout)),
+    textEntry('word/styles.xml', stylesXml(layout)),
     textEntry('word/settings.xml', settingsXml()),
-    textEntry('word/fontTable.xml', fontTableXml()),
-    textEntry('word/footer1.xml', footerXml()),
+    textEntry('word/fontTable.xml', fontTableXml(layout)),
+    textEntry('word/footer1.xml', footerXml(layout)),
     textEntry('word/_rels/document.xml.rels', documentRelationshipsXml(context.images)),
     ...context.images.map((image) => ({
       name: `word/media/${image.fileName}`,
@@ -798,26 +849,26 @@ function runXml(text: string, style: RunStyle = {}): string {
   return `<w:r>${properties ? `<w:rPr>${properties}</w:rPr>` : ''}${content}</w:r>`;
 }
 
-function documentXml(body: string): string {
+function documentXml(body: string, layout: WordTemplateConfig): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="${WORD_NAMESPACE}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body}<w:sectPr><w:footerReference w:type="default" r:id="rId4"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/><w:lnNumType w:countBy="1" w:restart="continuous"/><w:pgNumType w:start="1"/><w:cols w:space="720"/></w:sectPr></w:body></w:document>`;
+<w:document xmlns:w="${WORD_NAMESPACE}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body}<w:sectPr><w:footerReference w:type="default" r:id="rId4"/><w:pgSz w:w="${layout.paperWidth}" w:h="${layout.paperHeight}"/><w:pgMar w:top="${layout.margin}" w:right="${layout.margin}" w:bottom="${layout.margin}" w:left="${layout.margin}" w:header="${layout.headerMargin}" w:footer="${layout.footerMargin}" w:gutter="0"/><w:lnNumType w:countBy="1" w:restart="continuous"/><w:pgNumType w:start="1"/><w:cols w:space="720"/></w:sectPr></w:body></w:document>`;
 }
 
-function stylesXml(): string {
+function stylesXml(layout: WordTemplateConfig): string {
   const heading = (level: number) =>
-    `<w:style w:type="paragraph" w:styleId="Heading${level}"><w:name w:val="heading ${level}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="${level === 1 ? 360 : 240}" w:after="120" w:line="480" w:lineRule="auto"/><w:outlineLvl w:val="${level - 1}"/></w:pPr><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:b/><w:color w:val="000000"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>`;
+    `<w:style w:type="paragraph" w:styleId="Heading${level}"><w:name w:val="heading ${level}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="${level === 1 ? layout.headingOneBefore : layout.headingBefore}" w:after="120" w:line="${layout.lineSpacing}" w:lineRule="auto"/><w:outlineLvl w:val="${level - 1}"/></w:pPr><w:rPr><w:rFonts w:ascii="${layout.fontFamily}" w:hAnsi="${layout.fontFamily}" w:cs="${layout.fontFamily}"/><w:b/><w:color w:val="000000"/><w:sz w:val="${layout.headingSize}"/><w:szCs w:val="${layout.headingSize}"/></w:rPr></w:style>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="${WORD_NAMESPACE}">
-<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/><w:color w:val="000000"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="480" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
-<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="0" w:line="480" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240" w:line="480" w:lineRule="auto"/></w:pPr><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${layout.fontFamily}" w:hAnsi="${layout.fontFamily}" w:eastAsia="${layout.fontFamily}" w:cs="${layout.fontFamily}"/><w:color w:val="000000"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="${layout.lineSpacing}" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="0" w:line="${layout.lineSpacing}" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr><w:rPr><w:rFonts w:ascii="${layout.fontFamily}" w:hAnsi="${layout.fontFamily}" w:eastAsia="${layout.fontFamily}" w:cs="${layout.fontFamily}"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240" w:line="${layout.lineSpacing}" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="${layout.fontFamily}" w:hAnsi="${layout.fontFamily}" w:cs="${layout.fontFamily}"/><w:b/><w:color w:val="000000"/><w:sz w:val="${layout.titleSize}"/><w:szCs w:val="${layout.titleSize}"/></w:rPr></w:style>
 ${heading(1)}${heading(2)}${heading(3)}${heading(4)}${heading(5)}${heading(6)}
-<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:right="720"/><w:spacing w:line="480" w:lineRule="auto"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:line="480" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:right="720"/><w:spacing w:line="${layout.lineSpacing}" w:lineRule="auto"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:line="${layout.lineSpacing}" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="${layout.fontFamily}" w:hAnsi="${layout.fontFamily}"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:style>
-<w:style w:type="paragraph" w:styleId="Bibliography"><w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="360" w:hanging="360"/><w:spacing w:after="120" w:line="480" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="Bibliography"><w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="360" w:hanging="360"/><w:spacing w:after="120" w:line="${layout.lineSpacing}" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="Equation"><w:name w:val="Equation"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/></w:pPr></w:style>
-<w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="Caption"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:line="480" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="Caption"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:line="${layout.lineSpacing}" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
 </w:styles>`;
 }
 
@@ -828,6 +879,7 @@ function settingsXml(): string {
 
 interface ZoteroPreferencesInput {
   citationStyle: 'numeric' | 'author-year';
+  template: ExportTemplateId;
   locale: string;
   hasBibliography: boolean;
   sessionId: string;
@@ -843,7 +895,12 @@ interface ZoteroPreferencesInput {
  * Keep the names and values aligned with the payload emitted by Zotero.dotm.
  */
 function zoteroPreferencesXml(input: ZoteroPreferencesInput): string {
-  const styleId = input.citationStyle === 'numeric' ? NATURE_STYLE_ID : APA_STYLE_ID;
+  const styleId =
+    input.template === 'acs'
+      ? ACS_STYLE_ID
+      : input.citationStyle === 'numeric'
+        ? NATURE_STYLE_ID
+        : APA_STYLE_ID;
   const hasBibliography = input.hasBibliography ? '1' : '0';
   const locale = input.locale.trim() || 'en-US';
   return `<data data-version="3" zotero-version="${escapeXml(input.zoteroVersion)}"><session id="${escapeXml(input.sessionId)}"/><style id="${escapeXml(styleId)}" locale="${escapeXml(locale)}" hasBibliography="${hasBibliography}" bibliographyStyleHasBeenSet="1"/><prefs><pref name="fieldType" value="Field"/><pref name="noteType" value="0"/><pref name="automaticJournalAbbreviations" value="false"/><pref name="delayCitationUpdates" value="false"/></prefs></data>`;
@@ -860,9 +917,9 @@ function customPropertiesXml(documentPreferences: string): string {
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">${properties}</Properties>`;
 }
 
-function fontTableXml(): string {
+function fontTableXml(layout: WordTemplateConfig): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:fonts xmlns:w="${WORD_NAMESPACE}"><w:font w:name="Times New Roman"><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font></w:fonts>`;
+<w:fonts xmlns:w="${WORD_NAMESPACE}"><w:font w:name="${layout.fontFamily}"><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font></w:fonts>`;
 }
 
 function contentTypesXml(images: readonly EmbeddedImage[]): string {
@@ -892,9 +949,9 @@ function documentRelationshipsXml(images: readonly EmbeddedImage[]): string {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>${imageRelationships}</Relationships>`;
 }
 
-function footerXml(): string {
+function footerXml(layout: WordTemplateConfig): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:ftr xmlns:w="${WORD_NAMESPACE}"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`;
+<w:ftr xmlns:w="${WORD_NAMESPACE}"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:rFonts w:ascii="${layout.fontFamily}" w:hAnsi="${layout.fontFamily}"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`;
 }
 
 function corePropertiesXml(title: string): string {
@@ -904,7 +961,7 @@ function corePropertiesXml(title: string): string {
 
 function appPropertiesXml(): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>AcaNomo</Application><AppVersion>0.5.4</AppVersion></Properties>`;
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>AcaNomo</Application><AppVersion>0.5.6</AppVersion></Properties>`;
 }
 
 function textEntry(name: string, value: string): ZipEntry {

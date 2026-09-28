@@ -16,6 +16,7 @@ import { logDebug, logInfo, logWarn } from '../../lib/services/logger';
 import exportCssContent from '../styles/export-document.css?inline';
 import { buildAcademicDocx } from './docxExport';
 import { prepareLatexExport } from './latexExportService';
+import type { ExportTemplateId } from '../../lib/export/exportTemplates';
 
 const REMOTE_IMAGE_FETCH_TIMEOUT_MS = 8_000;
 const PDF_OUTLINE_MARKER_HOST = 'nomo-pdf-outline.invalid';
@@ -37,6 +38,8 @@ export interface ExportDocumentInput {
   suggestedFileName: string;
   /** 文档标题，用于 HTML <title>。 */
   title: string;
+  /** Selected journal-oriented preset for Word or LaTeX export. */
+  template?: ExportTemplateId;
 }
 
 export interface ExportResult {
@@ -159,6 +162,7 @@ export async function exportDocx(input: ExportDocumentInput): Promise<ExportResu
       renderedHtml: inlinedImages.html,
       title: input.title,
       citationStyle: settings.citationStyle,
+      ...(input.template ? { template: input.template } : {}),
       zoteroItems: exportItems.map((item) => ({
         key: item.key,
         uri: item.cslItem.id,
@@ -201,6 +205,7 @@ export async function exportLatex(input: ExportDocumentInput): Promise<ExportRes
     const bundle = await prepareLatexExport({
       markdown: input.markdown,
       bibliographyName,
+      ...(input.template ? { template: input.template } : {}),
       sourceDirectory: input.documentPath
         ? splitExportPath(input.documentPath, '').directory || null
         : null,

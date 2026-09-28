@@ -327,6 +327,21 @@ describe('exportService', () => {
     );
   });
 
+  it('passes the selected Word preset into the academic builder', async () => {
+    mocks.save.mockResolvedValue('C:\\Exports\\acs.docx');
+    mocks.buildAcademicDocx.mockReturnValue({
+      bytes: new Uint8Array([0x50, 0x4b]),
+      warnings: [],
+      citationIssues: [],
+    });
+
+    await exportDocx({ ...exportInput, template: 'acs' });
+
+    expect(mocks.buildAcademicDocx).toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'acs' }),
+    );
+  });
+
   it('exports matching .tex and .bib files and reports the sidecar and warnings', async () => {
     mocks.save.mockResolvedValue('D:\\Papers\\manuscript.tex');
     mocks.prepareLatexExport.mockResolvedValue({
@@ -360,6 +375,21 @@ describe('exportService', () => {
     });
     expect(mocks.exportFile.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.exportFile.mock.invocationCallOrder[1],
+    );
+  });
+
+  it('passes the selected LaTeX preset into the preparation service', async () => {
+    mocks.save.mockResolvedValue('D:\\Papers\\acs.tex');
+    mocks.prepareLatexExport.mockResolvedValue({
+      texContent: '\\documentclass{article}\n',
+      bibContent: '',
+      warnings: [],
+    });
+
+    await exportLatex({ ...exportInput, template: 'acs' });
+
+    expect(mocks.prepareLatexExport).toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'acs' }),
     );
   });
 

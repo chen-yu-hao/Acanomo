@@ -166,6 +166,7 @@
   import ContextMenu from './components/ContextMenu.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AcademicDialog from './components/AcademicDialog.svelte';
+  import ExportTemplateDialog from './components/ExportTemplateDialog.svelte';
   import TranslationDialog from './components/TranslationDialog.svelte';
   import UnsavedConfirmDialog from './components/UnsavedConfirmDialog.svelte';
   import ExternalChangeDialog from './components/ExternalChangeDialog.svelte';
@@ -292,6 +293,7 @@
   import { getOpenDocumentRenameBlock } from './services/documentRenameGuard';
   import { createMarkdownLintController } from './services/markdownLintController';
   import { EditorLinkResolutionError, resolveEditorLink } from './services/documentLinkNavigation';
+  import type { ExportFormat, ExportTemplateId } from '../lib/export/exportTemplates';
 
   const RECOVERY_KEY = 'nomo-save-recovery';
   const segmentedDocumentPort = createTauriSegmentedDocumentPort();
@@ -360,6 +362,7 @@
   let translationError = '';
   let translationBusy = false;
   let translationRequestId = 0;
+  let exportTemplateFormat: ExportFormat | null = null;
   let reviewMode = false;
   let reviewBaseline = '';
   let reviewBaselineCommit = '';
@@ -6658,13 +6661,30 @@
     showToast(t.featureComingSoon({ featureName }));
   }
 
-  async function handleExport(format: 'html' | 'pdf' | 'docx' | 'latex') {
+  function closeExportTemplateDialog() {
+    exportTemplateFormat = null;
+  }
+
+  function chooseExportTemplate(template: ExportTemplateId) {
+    const format = exportTemplateFormat;
+    exportTemplateFormat = null;
+    if (format) void handleExport(format, template);
+  }
+
+  async function handleExport(
+    format: 'html' | 'pdf' | 'docx' | 'latex',
+    template?: ExportTemplateId,
+  ) {
     if (isSegmentedTextTab(tabs.find((tab) => tab.id === activeTabId))) {
       // TXT/JSON 不进入 Markdown HTML/PDF 导出链路。
       return;
     }
     if (!nativePath && !markdown.trim()) {
       showToast(t.noOpenDocumentForExport(), 2000);
+      return;
+    }
+    if ((format === 'docx' || format === 'latex') && !template) {
+      exportTemplateFormat = format;
       return;
     }
 
@@ -6689,6 +6709,7 @@
       documentPath: nativePath,
       suggestedFileName,
       title: fileName || 'Untitled',
+      template,
     };
     const result =
       format === 'html'
@@ -7384,6 +7405,16 @@
       onClose={closeContextMenu}
     />
   {/key}
+{/if}
+
+{#if exportTemplateFormat}
+  <ExportTemplateDialog
+    open={true}
+    format={exportTemplateFormat}
+    {interfaceLocale}
+    onClose={closeExportTemplateDialog}
+    onSelect={chooseExportTemplate}
+  />
 {/if}
 
 {#if academicDialogMode}

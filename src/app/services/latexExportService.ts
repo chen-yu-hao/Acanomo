@@ -5,6 +5,7 @@ import {
   type LatexExportBundle,
 } from '../../lib/export/latex';
 import { fetchZoteroExportItems } from '../../lib/services/zotero';
+import type { ExportTemplateId } from '../../lib/export/exportTemplates';
 
 export interface PrepareLatexExportInput {
   markdown: string;
@@ -14,6 +15,7 @@ export interface PrepareLatexExportInput {
   bibliographyName?: string;
   /** Absolute directory containing the source Markdown document. */
   sourceDirectory?: string | null;
+  template?: ExportTemplateId;
 }
 
 /**
@@ -33,5 +35,6 @@ export async function prepareLatexExport(
       citationKey: item.citationKey,
       bibtex: item.bibtex,
     })),
+    template: input.template,
   });
 }
