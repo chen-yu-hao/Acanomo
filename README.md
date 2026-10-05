@@ -23,6 +23,7 @@
 </p>
 
 ---
+本项目完全基于 [https://linux.do/t/topic/2429696](https://linux.do/t/topic/2429696) 修改实现，**Nomo** 是一个小而美的Markdown编辑器，推荐使用。
 
 AcaNomo 是一款本地优先、Markdown-first 的桌面编辑器，支持 macOS 与 Windows。它以 Markdown 文本作为文档主数据，在语义编辑与源码模式之间保持一致，同时提供面向论文写作的公式、引用与审阅工作流，以及 TXT、JSON 大文件分段编辑、文件管理、文档导航和桌面集成能力。
 
@@ -338,4 +339,4 @@ AcaNomo 是自由开源软件，使用 [GNU Affero General Public License v3.0 o
 
 ## 致谢
 
-感谢 Tauri、Svelte、ProseMirror、CodeMirror、markdown-it、Shiki、KaTeX、Mermaid、markdownlint、GSAP、Lucide 和 Inlang 等开源项目。
+感谢 nomo 项目。感谢 Tauri、Svelte、ProseMirror、CodeMirror、markdown-it、Shiki、KaTeX、Mermaid、markdownlint、GSAP、Lucide 和 Inlang 等开源项目。
