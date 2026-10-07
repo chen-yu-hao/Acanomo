@@ -153,8 +153,10 @@ markdownIt.inline.ruler.after('backticks', 'math_inline', (state, silent) => {
     const token = state.push('math_inline', '', 0);
     token.content = tex;
     token.markup = '$';
-    state.pos = end + 1;
   }
+  // Link-label lookahead also calls inline rules in silent mode. A matched
+  // rule must always advance the cursor, even when it does not emit a token.
+  state.pos = end + 1;
   return true;
 });
 
@@ -250,11 +252,11 @@ markdownIt.inline.ruler.after('image', 'image_attrs', (state, silent) => {
     attrs[part.slice(0, eq)] = part.slice(eq + 1);
   }
 
-  if (silent) return true;
-
-  // 回写到 image token 的 attrs 中（attrs 是 [name, value] 数组，需用 attrSet）
-  if (attrs.align) prevToken.attrSet('align', attrs.align);
-  if (attrs.width) prevToken.attrSet('width', attrs.width);
+  if (!silent) {
+    // 回写到 image token 的 attrs 中（attrs 是 [name, value] 数组，需用 attrSet）
+    if (attrs.align) prevToken.attrSet('align', attrs.align);
+    if (attrs.width) prevToken.attrSet('width', attrs.width);
+  }
 
   state.pos = closeBrace + 1;
   return true;
@@ -279,13 +281,13 @@ markdownIt.inline.ruler.before('html_inline', 'image_html_inline', (state, silen
   const imgAttrs = parseHtmlImgAttrs(tagContent);
   if (!imgAttrs.src) return false;
 
-  if (silent) return true;
-
-  const token = state.push('image', 'img', 0);
-  token.attrSet('src', imgAttrs.src);
-  if (imgAttrs.alt !== null) token.attrSet('alt', imgAttrs.alt);
-  if (imgAttrs.title) token.attrSet('title', imgAttrs.title);
-  if (imgAttrs.width) token.attrSet('width', imgAttrs.width);
+  if (!silent) {
+    const token = state.push('image', 'img', 0);
+    token.attrSet('src', imgAttrs.src);
+    if (imgAttrs.alt !== null) token.attrSet('alt', imgAttrs.alt);
+    if (imgAttrs.title) token.attrSet('title', imgAttrs.title);
+    if (imgAttrs.width) token.attrSet('width', imgAttrs.width);
+  }
 
   // 删除属性块空行（如果有）
   state.pos = end + 1;
